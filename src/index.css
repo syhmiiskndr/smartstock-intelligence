@@ -1,0 +1,10 @@
+/* Global styles only. Each page keeps its own styles in src/pages/<Page>.css */
+html,
+body {
+  margin: 0;
+  background: #eef1ef;
+}
+
+#root {
+  min-height: 100vh;
+}
