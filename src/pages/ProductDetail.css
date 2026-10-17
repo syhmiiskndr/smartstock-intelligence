@@ -1,0 +1,69 @@
+.pg-productdetail {
+  margin: 0;
+  background: #eef1ef;
+  color: #14231e;
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.pg-productdetail a {
+  color: #14231e;
+  text-decoration: none;
+}
+.pg-productdetail a:hover {
+  color: #2d4be0;
+}
+.pg-productdetail .d {
+  font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif;
+  letter-spacing: -0.03em;
+}
+.pg-productdetail .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 11px;
+  background: #14231e;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.pg-productdetail .btn:hover {
+  background: #2d4be0;
+  color: #fff;
+}
+.pg-productdetail .btn.ghost {
+  background: transparent;
+  color: #14231e;
+  box-shadow: inset 0 0 0 1px #bfcac4;
+}
+.pg-productdetail .btn.ghost:hover {
+  background: #e3e8fd;
+  color: #14231e;
+  box-shadow: inset 0 0 0 1px #2d4be0;
+}
+.pg-productdetail .tab {
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  height: 40px;
+  padding: 0 4px;
+  margin-right: 24px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #55645e;
+  cursor: pointer;
+}
+.pg-productdetail .tab:hover {
+  color: #14231e;
+}
+.pg-productdetail .tab.on {
+  color: #14231e;
+  border-bottom-color: #14231e;
+}
+.pg-productdetail a:focus-visible,
+.pg-productdetail button:focus-visible {
+  outline: 2px solid #2d4be0;
+  outline-offset: 3px;
+}
