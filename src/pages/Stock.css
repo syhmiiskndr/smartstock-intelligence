@@ -1,0 +1,94 @@
+.pg-stock {
+  margin: 0;
+  background: #eef1ef;
+  color: #14231e;
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.pg-stock a {
+  color: #14231e;
+  text-decoration: none;
+}
+.pg-stock a:hover {
+  color: #2d4be0;
+}
+.pg-stock .d {
+  font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif;
+  letter-spacing: -0.03em;
+}
+.pg-stock .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 11px;
+  background: #14231e;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+.pg-stock .btn:hover {
+  background: #2d4be0;
+  color: #fff;
+}
+.pg-stock .btn.ghost {
+  background: transparent;
+  color: #14231e;
+  box-shadow: inset 0 0 0 1px #bfcac4;
+}
+.pg-stock .btn.ghost:hover {
+  background: #e3e8fd;
+  box-shadow: inset 0 0 0 1px #2d4be0;
+}
+.pg-stock .field {
+  width: 100%;
+  box-sizing: border-box;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid #bfcac4;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  color: #14231e;
+  background: #fff;
+}
+.pg-stock .field:focus {
+  outline: 2px solid #2d4be0;
+  outline-offset: 1px;
+  border-color: #2d4be0;
+}
+.pg-stock .seg {
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  height: 40px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #55645e;
+  cursor: pointer;
+}
+.pg-stock .seg:hover {
+  color: #14231e;
+}
+.pg-stock .seg.on {
+  background: #fff;
+  color: #14231e;
+  box-shadow: 0 1px 2px rgba(20, 35, 30, 0.18);
+}
+.pg-stock .lbl {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.pg-stock a:focus-visible,
+.pg-stock button:focus-visible {
+  outline: 2px solid #2d4be0;
+  outline-offset: 3px;
+}
