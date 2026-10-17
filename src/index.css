@@ -8,3 +8,62 @@ body {
 #root {
   min-height: 100vh;
 }
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+/* ---------- App shell: sidebar + main card (all signed-in pages) ---------- */
+/* Tablet and mobile (below 1024px): the sidebar becomes a drawer, so the main card gets the full width */
+@media (max-width: 1023px) {
+  .app-shell {
+    min-height: 100vh !important;
+    flex-wrap: nowrap !important;
+    padding-top: 56px; /* room for the fixed top bar */
+  }
+  .app-side {
+    flex: 0 0 0 !important;
+    width: 0;
+  }
+  .app-main {
+    flex: 1 1 auto !important;
+    padding: 12px !important;
+  }
+  .app-card {
+    min-height: 0 !important;
+    padding: 28px 28px 32px !important;
+    border-radius: 18px !important;
+  }
+}
+
+/* Mobile (below 640px) */
+@media (max-width: 639px) {
+  .app-main {
+    padding: 8px !important;
+  }
+  .app-card {
+    padding: 20px 16px 24px !important;
+    border-radius: 16px !important;
+  }
+  .app-card h1 {
+    font-size: 26px !important;
+  }
+  .app-card .btn,
+  .app-card button,
+  .app-card select,
+  .app-card input,
+  .app-card textarea {
+    min-height: 44px; /* comfortable touch targets */
+  }
+  .app-card input,
+  .app-card select,
+  .app-card textarea {
+    font-size: 16px !important; /* stops iOS zooming into fields */
+  }
+}
