@@ -18,7 +18,7 @@ export default class Adjustments extends DCLogic {
         batch: 'O-032',
         change: '−1.5 kg',
         reason: 'Damaged in delivery, not sellable',
-        by: 'Daniel',
+        by: 'Amin',
         when: 'Today, 08:55',
         status: 'pending',
       },
@@ -28,7 +28,7 @@ export default class Adjustments extends DCLogic {
         batch: 'N-077',
         change: '+2 kg',
         reason: 'Count correction after stock take',
-        by: 'Siti',
+        by: 'Aina',
         when: 'Yesterday, 17:40',
         status: 'pending',
       },
@@ -38,7 +38,7 @@ export default class Adjustments extends DCLogic {
         batch: 'L-014',
         change: '−3 kg',
         reason: 'Wilted and discarded',
-        by: 'Farid',
+        by: 'Tanusha',
         when: 'Yesterday, 15:10',
         status: 'approved',
       },
@@ -48,7 +48,7 @@ export default class Adjustments extends DCLogic {
         batch: 'H-009',
         change: '−1 kg',
         reason: 'Shelf count looked low',
-        by: 'Siti',
+        by: 'Aina',
         when: '12 Oct, 11:20',
         status: 'rejected',
       },
@@ -78,7 +78,7 @@ export default class Adjustments extends DCLogic {
         product: 'Bananas',
         batch: 'N-079',
         qty: '+25 kg',
-        by: 'Farid',
+        by: 'Amin',
         reason: 'Delivery',
       },
       {
@@ -87,7 +87,7 @@ export default class Adjustments extends DCLogic {
         product: 'Gala apples',
         batch: 'A-077',
         qty: '−3 kg',
-        by: 'Daniel',
+        by: 'Tanusha',
         reason: 'Waste',
       },
       {
@@ -96,7 +96,7 @@ export default class Adjustments extends DCLogic {
         product: 'Strawberries',
         batch: 'S-044',
         qty: '−2 kg',
-        by: 'Aina',
+        by: 'Syahmi',
         reason: 'Expired, removed',
       },
       {
@@ -105,7 +105,7 @@ export default class Adjustments extends DCLogic {
         product: 'Oranges',
         batch: 'O-032',
         qty: '−4 kg',
-        by: 'Siti',
+        by: 'Aina',
         reason: 'Sale',
       },
       {
@@ -114,7 +114,7 @@ export default class Adjustments extends DCLogic {
         product: 'Red grapes',
         batch: 'G-126',
         qty: '+40 kg',
-        by: 'Farid',
+        by: 'Amin',
         reason: 'Delivery',
       },
       {
@@ -123,7 +123,7 @@ export default class Adjustments extends DCLogic {
         product: 'Papayas',
         batch: 'P-118',
         qty: '−6 kg',
-        by: 'Siti',
+        by: 'Amin',
         reason: 'Sale',
       },
       {
@@ -132,7 +132,7 @@ export default class Adjustments extends DCLogic {
         product: 'Papayas',
         batch: 'P-125',
         qty: '+8 kg',
-        by: 'Farid',
+        by: 'Aina',
         reason: 'Delivery',
       },
       {
@@ -141,7 +141,7 @@ export default class Adjustments extends DCLogic {
         product: 'Papayas',
         batch: 'P-118',
         qty: '−6 kg',
-        by: 'Daniel',
+        by: 'Tanusha',
         reason: 'Used in kitchen',
       },
     ];
@@ -328,7 +328,7 @@ export default class Adjustments extends DCLogic {
                                         background: '#2E8B5B',
                                       }}
                                     ></span>
-                                    Approved by Aina
+                                    Approved by Syahmi
                                   </span>
                                 </>
                               ) : null}
@@ -355,7 +355,7 @@ export default class Adjustments extends DCLogic {
                                         background: '#C2384D',
                                       }}
                                     ></span>
-                                    Rejected by Aina
+                                    Rejected by Syahmi
                                   </span>
                                 </>
                               ) : null}
