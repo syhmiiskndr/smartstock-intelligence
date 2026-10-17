@@ -52,7 +52,7 @@ export default class Dashboard extends DCLogic {
                     className="d"
                     style={{ margin: '0', fontSize: '34px', lineHeight: '1.1', fontWeight: '600' }}
                   >
-                    Good morning, Aina
+                    Good morning, Syahmi
                   </h1>
                   <p style={{ margin: '8px 0 0', fontSize: '15.5px', color: '#55645E' }}>
                     Thursday 15 October. Two batches need attention today.
@@ -502,7 +502,7 @@ export default class Dashboard extends DCLogic {
                         <span>Stock-in</span>
                         <span>Bananas N-079</span>
                         <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>+25 kg</span>
-                        <span>Farid</span>
+                        <span>Amin</span>
                       </div>
                       <div
                         style={{
@@ -517,7 +517,7 @@ export default class Dashboard extends DCLogic {
                         <span>Stock-out</span>
                         <span>Gala apples A-077</span>
                         <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>−3 kg</span>
-                        <span>Daniel</span>
+                        <span>Tanusha</span>
                       </div>
                       <div
                         style={{
@@ -532,7 +532,7 @@ export default class Dashboard extends DCLogic {
                         <span>Adjustment</span>
                         <span>Strawberries S-044</span>
                         <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>−2 kg</span>
-                        <span>Aina</span>
+                        <span>Syahmi</span>
                       </div>
                       <div
                         style={{
@@ -547,7 +547,7 @@ export default class Dashboard extends DCLogic {
                         <span>Stock-out</span>
                         <span>Oranges O-032</span>
                         <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>−4 kg</span>
-                        <span>Siti</span>
+                        <span>Aina</span>
                       </div>
                       <div
                         style={{
@@ -561,7 +561,7 @@ export default class Dashboard extends DCLogic {
                         <span>Stock-in</span>
                         <span>Red grapes G-126</span>
                         <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>+40 kg</span>
-                        <span>Farid</span>
+                        <span>Amin</span>
                       </div>
                     </div>
                   </div>
