@@ -1,0 +1,67 @@
+.pg-login {
+  margin: 0;
+  background: #eef1ef;
+  color: #14231e;
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.pg-login a {
+  color: #14231e;
+  text-decoration: none;
+}
+.pg-login a:hover {
+  color: #2d4be0;
+}
+.pg-login .d {
+  font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif;
+  letter-spacing: -0.03em;
+}
+.pg-login .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  border-radius: 12px;
+  background: #14231e;
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+}
+.pg-login .btn:hover {
+  background: #2d4be0;
+  color: #fff;
+}
+.pg-login .field {
+  width: 100%;
+  box-sizing: border-box;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #bfcac4;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 16px;
+  color: #14231e;
+  background: #fff;
+}
+.pg-login .field:focus {
+  outline: 2px solid #2d4be0;
+  outline-offset: 1px;
+  border-color: #2d4be0;
+}
+.pg-login a:focus-visible {
+  outline: 2px solid #2d4be0;
+  outline-offset: 3px;
+}
+
+/* Tablet and mobile: tighter padding, and the floating card art is hidden when there is no room */
+@media (max-width: 1023px) {
+  .pg-login .login-brand-panel {
+    padding: 28px 24px !important;
+    min-height: 0 !important;
+  }
+}
+@media (max-width: 639px) {
+  .pg-login .login-art {
+    display: none;
+  }
+}
