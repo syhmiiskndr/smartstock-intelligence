@@ -196,9 +196,9 @@ export default class Sidebar extends DCLogic {
             ))}
           </nav>
           <div className="sb-user">
-            <span className="sb-avatar">NA</span>
+            <span className="sb-avatar">SI</span>
             <div className="sb-who">
-              <div className="sb-name">Nur Aina</div>
+              <div className="sb-name">Syahmi Iskandar</div>
               <div className="sb-role">Admin / Manager</div>
             </div>
             <Link to="/login" className="sb-out">
