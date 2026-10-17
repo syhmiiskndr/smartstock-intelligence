@@ -241,7 +241,7 @@ export default class Login extends DCLogic {
                       id="email"
                       className="field"
                       type="email"
-                      placeholder="aina@segarmart.example"
+                      placeholder="syahmi1170@gmail.com"
                       autoComplete="username"
                     />
                   </div>
@@ -279,7 +279,7 @@ export default class Login extends DCLogic {
                     color: '#2C3B35',
                   }}
                 >
-                  This is a prototype. Press Log in to continue as an inventory manager.
+                  This is a draft website. Press Log in to continue as an inventory manager.
                 </p>
               </div>
             </div>
