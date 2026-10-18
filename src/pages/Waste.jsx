@@ -28,9 +28,9 @@ export default class Waste extends DCLogic {
       error: '',
       editing: null,
       records: [
-        { id: 'W-0012', batch: 'N-079', product: 'Bananas', qty: 4, cost: 12.8, reason: 'Spoiled', by: 'Aina', date: '16 Oct', rev: 0 },
-        { id: 'W-0011', batch: 'P-118', product: 'Papayas', qty: 2, cost: 9.0, reason: 'Expired', by: 'Daniel', date: '15 Oct', rev: 1 },
-        { id: 'W-0010', batch: 'A-077', product: 'Gala apples', qty: 3, cost: 17.4, reason: 'Damaged', by: 'Aina', date: '13 Oct', rev: 0 },
+        { id: 'W-0012', batch: 'N-079', product: 'Bananas', qty: 4, cost: 12.8, reason: 'Spoiled', by: 'Syahmi', date: '16 Oct', rev: 0 },
+        { id: 'W-0011', batch: 'P-118', product: 'Papayas', qty: 2, cost: 9.0, reason: 'Expired', by: 'Haikal', date: '15 Oct', rev: 1 },
+        { id: 'W-0010', batch: 'A-077', product: 'Gala apples', qty: 3, cost: 17.4, reason: 'Damaged', by: 'Syahmi', date: '13 Oct', rev: 0 },
       ],
     };
   }
