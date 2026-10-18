@@ -500,7 +500,7 @@ export default class ProductDetail extends DCLogic {
                           <span style={{ color: '#55645E' }}>14 Oct, 17:20</span>
                           <span>Stock-out</span>
                           <span>P-118</span>
-                          <span>Siti</span>
+                          <span>Aina</span>
                           <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             −6 kg
                           </span>
@@ -517,7 +517,7 @@ export default class ProductDetail extends DCLogic {
                           <span style={{ color: '#55645E' }}>14 Oct, 07:55</span>
                           <span>Stock-in</span>
                           <span>P-125</span>
-                          <span>Farid</span>
+                          <span>Amin</span>
                           <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             +8 kg
                           </span>
@@ -534,7 +534,7 @@ export default class ProductDetail extends DCLogic {
                           <span style={{ color: '#55645E' }}>13 Oct, 09:10</span>
                           <span>Stock-out</span>
                           <span>P-118</span>
-                          <span>Daniel</span>
+                          <span>Tanusha</span>
                           <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             −6 kg
                           </span>
@@ -551,7 +551,7 @@ export default class ProductDetail extends DCLogic {
                           <span style={{ color: '#55645E' }}>12 Oct, 08:05</span>
                           <span>Stock-in</span>
                           <span>P-118</span>
-                          <span>Farid</span>
+                          <span>Amin</span>
                           <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             +30 kg
                           </span>
@@ -569,7 +569,7 @@ export default class ProductDetail extends DCLogic {
                           <span style={{ color: '#55645E' }}>11 Oct, 08:30</span>
                           <span>Stock-in</span>
                           <span>P-121</span>
-                          <span>Farid</span>
+                          <span>Aina</span>
                           <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             +20 kg
                           </span>
@@ -635,7 +635,7 @@ export default class ProductDetail extends DCLogic {
                               Fresh 94%
                             </span>
                           </span>
-                          <span>Farid</span>
+                          <span>Amin</span>
                         </div>
                         <div
                           style={{
@@ -674,7 +674,7 @@ export default class ProductDetail extends DCLogic {
                               Fresh 97%
                             </span>
                           </span>
-                          <span>Siti</span>
+                          <span>Aina</span>
                         </div>
                         <div
                           style={{
@@ -714,7 +714,7 @@ export default class ProductDetail extends DCLogic {
                               Fresh 96%
                             </span>
                           </span>
-                          <span>Farid</span>
+                          <span>Amin</span>
                         </div>
                       </div>
                       <p style={{ margin: '14px 0 0', fontSize: '13px', color: '#55645E' }}>
