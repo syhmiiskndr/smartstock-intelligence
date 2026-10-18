@@ -986,7 +986,7 @@ export default class Home extends DCLogic {
               color: '#55645E',
             }}
           >
-            <span>SmartStock Intelligence. A UTeM Workshop II project.</span>{' '}
+            <span>SmartStock Intelligence. K44 Workshop II project.</span>{' '}
             <span style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
               <Link to="/dashboard" style={{ color: '#55645E' }}>
                 Dashboard
