@@ -524,7 +524,7 @@ export default class Settings extends DCLogic {
                         }}
                       >
                         <span style={{ color: '#55645E' }}>Today, 09:05</span>
-                        <span style={{ fontWeight: '600' }}>Aina</span>
+                        <span style={{ fontWeight: '600' }}>Syahmi</span>
                         <span>Recorded an adjustment of −2 kg on strawberries, batch S-044.</span>
                       </div>
                       <div
@@ -537,7 +537,7 @@ export default class Settings extends DCLogic {
                         }}
                       >
                         <span style={{ color: '#55645E' }}>Today, 07:58</span>
-                        <span style={{ fontWeight: '600' }}>Aina</span>
+                        <span style={{ fontWeight: '600' }}>Syahmi</span>
                         <span>Logged in.</span>
                       </div>
                       <div
@@ -550,7 +550,7 @@ export default class Settings extends DCLogic {
                         }}
                       >
                         <span style={{ color: '#55645E' }}>Yesterday, 18:20</span>
-                        <span style={{ fontWeight: '600' }}>Amir</span>
+                        <span style={{ fontWeight: '600' }}>Haikal</span>
                         <span>Changed the default expiry warning from 2 days to 3 days.</span>
                       </div>
                       <div
@@ -576,8 +576,8 @@ export default class Settings extends DCLogic {
                         }}
                       >
                         <span style={{ color: '#55645E' }}>2 Sep, 10:14</span>
-                        <span style={{ fontWeight: '600' }}>Amir</span>
-                        <span>Deactivated the user Hana Zulkifli.</span>
+                        <span style={{ fontWeight: '600' }}>Syahmi</span>
+                        <span>Deactivated the user Syaza Irdini.</span>
                       </div>
                       <div
                         style={{
@@ -589,7 +589,7 @@ export default class Settings extends DCLogic {
                         }}
                       >
                         <span style={{ color: '#55645E' }}>1 Sep, 09:30</span>
-                        <span style={{ fontWeight: '600' }}>Amir</span>
+                        <span style={{ fontWeight: '600' }}>Amin</span>
                         <span>Activated model freshness-v1.</span>
                       </div>
                     </div>
