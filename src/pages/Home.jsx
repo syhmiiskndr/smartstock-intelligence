@@ -959,8 +959,7 @@ export default class Home extends DCLogic {
                     maxWidth: '520px',
                   }}
                 >
-                  This prototype is clickable. Log in, receive some stock, open an alert and run a photo
-                  inspection.
+                  This prototype is clickable.
                 </p>
               </div>
               <Link
