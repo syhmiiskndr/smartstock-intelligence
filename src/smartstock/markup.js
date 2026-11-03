@@ -1,14 +1,5 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>SmartStock Intelligence</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div id="app">
+/* Static markup of the voice app shell (header, stage, island, dock, login). */
+export default `<div id="app">
   <header class="bar">
     <div class="lhs"><button class="brand" id="brand" aria-label="Home">
       <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="#007AFF" stroke-width="3.2" stroke-dasharray="52 100" stroke-linecap="round" transform="rotate(-90 14 14)"/><circle cx="14" cy="14" r="6" fill="none" stroke="#34C759" stroke-width="3.2" stroke-dasharray="26 100" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>
@@ -45,7 +36,4 @@
   <div id="dockitems"></div><i class="dsep"></i>
   <button id="orb" data-state="idle" aria-label="Speak"><span class="mic"></span><span class="wave"></span><span class="spin"></span></button>
 </nav>
-<div id="login" hidden></div>
-<script src="app.js"></script>
-</body>
-</html>
+<div id="login" hidden></div>`;
