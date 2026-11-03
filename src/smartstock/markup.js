@@ -1,0 +1,39 @@
+/* Static markup of the voice app shell (header, stage, island, dock, login). */
+export default `<div id="app">
+  <header class="bar">
+    <div class="lhs"><button class="brand" id="brand" aria-label="Home">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="#007AFF" stroke-width="3.2" stroke-dasharray="52 100" stroke-linecap="round" transform="rotate(-90 14 14)"/><circle cx="14" cy="14" r="6" fill="none" stroke="#34C759" stroke-width="3.2" stroke-dasharray="26 100" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg>
+      <span>SmartStock</span></button><span class="biz" id="biz"></span></div>
+    <div class="rhs"><button class="tbtn bell" id="t-bell"></button><button class="avatar" id="t-user" aria-label="Account">S</button></div>
+  </header>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="Role"><button data-role="admin" aria-pressed="true">Admin</button><button data-role="staff" aria-pressed="false">Staff</button></div>
+    <button class="tbtn" id="t-demo" aria-pressed="false"></button>
+    <button class="tbtn" id="t-log"></button>
+    <button class="tbtn" id="t-lang"></button>
+  </div>
+  <main id="stage"></main>
+</div>
+
+<div id="island" data-state="idle" data-mode="" role="status" aria-live="polite" title="Tap to type a command">
+  <span class="dot"></span><span class="isl-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+  <span class="hint" id="hint"></span>
+  <div id="isl-note"><i id="isl-ic"></i><div style="min-width:0"><b id="isl-t"></b><span id="isl-b"></span></div></div>
+</div>
+
+<div id="panel" class="panel" hidden></div>
+<aside id="drawer" aria-label="Item details"></aside>
+<form id="cmd" class="cmd" hidden>
+  <p class="note" id="cmd-note"></p>
+  <div style="display:flex;gap:8px"><input id="cmd-input" autocomplete="off" aria-label="Command"><button class="btn primary" type="submit">Send</button></div>
+  <div class="p-chips" id="cmd-chips" style="margin:0"></div>
+</form>
+<div class="tip" id="tip"></div>
+<div class="toasts" id="toasts" hidden></div>
+<div id="petals" hidden></div><div id="scrim" hidden></div><button id="b-menu" hidden></button><button id="b-type" hidden></button>
+
+<nav class="dock" aria-label="Main">
+  <div id="dockitems"></div><i class="dsep"></i>
+  <button id="orb" data-state="idle" aria-label="Speak"><span class="mic"></span><span class="wave"></span><span class="spin"></span></button>
+</nav>
+<div id="login" hidden></div>`;
