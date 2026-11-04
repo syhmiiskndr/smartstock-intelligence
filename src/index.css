@@ -1,4 +1,4 @@
-/* Global styles only. The app's own styles live in src/smartstock/voice.css (scoped under #ss-root). */
+/* Global styles only. The app's own styles live in src/styles/smartstock.css (scoped under #ss-root). */
 html,
 body {
   margin: 0;

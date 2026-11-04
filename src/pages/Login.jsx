@@ -1,10 +1,11 @@
-import { useVoicePage } from '../smartstock/useVoicePage';
+import { useEffect } from 'react';
+import { S, signOut } from '../store/store';
 
 export const path = '/login';
 export const title = 'Sign in · SmartStock';
 
-// The page itself is drawn by the shared voice engine; this file only says which scene to show.
+// The lock screen itself is drawn by AppShell whenever nobody is signed in.
 export default function Login() {
-  useVoicePage('login');
+  useEffect(() => { if (S.user) signOut(); }, []);
   return null;
 }

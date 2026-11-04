@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import AppShell from './components/AppShell';
 
 // Every file in src/pages exports `path`, `title` and a default component.
 // Adding a page file adds its route, so no shared file needs editing.
@@ -8,10 +9,9 @@ const pages = Object.values(modules).filter((m) => m.path && m.default);
 
 function NotFound() {
   return (
-    <div style={{ padding: 48, fontFamily: "'Instrument Sans', system-ui, sans-serif", color: '#14231E' }}>
+    <div style={{ padding: 48 }}>
       <h1 style={{ margin: 0 }}>Page not found</h1>
-      <p>This page is not built yet, or it is on a branch that has not been merged.</p>
-      <Link to="/">Back to home</Link>
+      <p><Link to="/">Back to home</Link></p>
     </div>
   );
 }
@@ -30,10 +30,10 @@ export default function App() {
     <>
       <TitleSync />
       <Routes>
-        {pages.map((p) => (
-          <Route key={p.path} path={p.path} element={<p.default />} />
-        ))}
-        <Route path="*" element={<NotFound />} />
+        <Route element={<AppShell />}>
+          {pages.map((p) => <Route key={p.path} path={p.path} element={<p.default />} />)}
+          <Route path="*" element={<NotFound />} />
+        </Route>
       </Routes>
     </>
   );
