@@ -338,7 +338,6 @@
 @keyframes ss-spin{to{transform:rotate(360deg)}}
 @keyframes ss-ripple{from{transform:scale(.9);opacity:.9}to{transform:scale(1.6);opacity:0}}
 #ss-root #orb .mic,#ss-root #orb .wave{display:none!important}
-@media(max-width:520px){#ss-root .dk{width:40px;height:40px;border-radius:12px}#ss-root .dk svg{width:19px;height:19px}#ss-root #orb{width:42px;height:42px}#ss-root #dockitems{gap:6px}#ss-root .dock{gap:6px;padding:8px 9px;border-radius:24px}}
 
 /* sign in */
 #ss-root #login{position:fixed;inset:0;z-index:100;background:#0b0b10;color:#fff;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center}
@@ -417,3 +416,96 @@
 #ss-root .w-health .hl div{flex:1;align-items:center;gap:4px;line-height:1.3}
 #ss-root .w-health .tbtn{align-self:center;margin-top:10px}
 @media(max-width:420px){#ss-root .w-health .hl{flex-direction:column;gap:14px}}
+
+/* ================= responsive: one codebase, three layouts =================
+ * phone    up to 640px      iPhone, Android
+ * tablet   641px to 1024px  iPad portrait, small tablets
+ * desktop  1025px and up    laptop, desktop, iPad Pro landscape
+ * Touch is detected separately, with (hover:none) and (pointer:coarse), so an iPad with a mouse or a touch laptop still behaves right. */
+#ss-root{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+#ss-root button,#ss-root [data-say],#ss-root .chip,#ss-root .tile{touch-action:manipulation}
+#ss-root #stage{overscroll-behavior-y:contain}
+#ss-root #app{padding-top:env(safe-area-inset-top,0px)}
+#ss-root .panel,#ss-root .cmd{max-height:56vh;max-height:56dvh}
+#ss-root #drawer{top:calc(10px + env(safe-area-inset-top,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+#ss-root .chart{touch-action:pan-y}
+/* keyboard open: lift the typing box above it */
+#ss-root.kb-open .cmd{bottom:calc(var(--kb,0px) + 12px)}
+/* sign in: scrolls when the screen is short (landscape phone, keyboard open) */
+#ss-root #login{overflow-x:hidden;overflow-y:auto;justify-content:flex-start;padding:max(24px,env(safe-area-inset-top,0px)) 16px calc(24px + var(--kb,0px))}
+#ss-root #login::before,#ss-root #login::after{position:fixed}
+#ss-root #login>:first-child{margin-top:auto}
+#ss-root #login>:last-child{margin-bottom:auto}
+
+/* tablet: home widgets in 2 and 3 columns instead of one long column */
+@media(min-width:641px) and (max-width:860px){
+  #ss-root .w-health{grid-column:1/-1;grid-row:auto}
+  #ss-root .w-s{grid-column:span 6}
+  #ss-root .w-m{grid-column:span 4}
+}
+
+/* phone */
+@media(max-width:640px){
+  /* the dock fills the width, the icons scroll sideways, the mic orb always stays in view */
+  #ss-root .dock{left:8px;right:8px;width:auto;max-width:none;transform:none;gap:8px;padding:8px 10px;border-radius:26px;bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  #ss-root #dockitems{flex:1;min-width:0;gap:8px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;padding:10px 8px 12px;margin:-10px -8px -12px}
+  #ss-root #dockitems::-webkit-scrollbar{display:none}
+  /* few icons (staff): centre them. Auto margins centre without making the first icon unreachable when they overflow */
+  #ss-root #dockitems>.dk:first-child{margin-left:auto}
+  #ss-root #dockitems>.dk:last-child{margin-right:auto}
+  #ss-root .dk{flex:none;width:46px;height:46px;border-radius:14px}
+  #ss-root .dk svg{width:22px;height:22px}
+  #ss-root #orb{width:46px;height:46px}
+  #ss-root .dk.bounce{animation-name:ss-bounce-s}
+  /* the island opens wider so alerts can be read (it floats over the header for a few seconds, like on an iPhone) */
+  #ss-root #island[data-state=listening],#ss-root #island[data-mode=note]{max-width:calc(100vw - 24px);min-width:min(340px,calc(100vw - 24px))}
+  /* answer card and typing box sit above the shorter dock */
+  #ss-root .panel,#ss-root .cmd{bottom:calc(100px + env(safe-area-inset-bottom,0px));width:calc(100vw - 24px)}
+  /* the item sheet fills the screen */
+  #ss-root #drawer{left:8px;right:8px;width:auto;top:calc(8px + env(safe-area-inset-top,0px));bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+  /* chart labels are drawn in SVG units, so enlarge them to stay readable once the chart is scaled down */
+  #ss-root .chart text,#ss-root .spark text{font-size:18px}
+  /* settings rows: the slider goes under its label instead of squeezing the text */
+  #ss-root .rule:has(.slide){flex-wrap:wrap}
+  #ss-root .slide{min-width:0;width:100%}
+  #ss-root .slide input{flex:1;width:auto}
+  #ss-root .cost-tools{flex-wrap:wrap}
+  #ss-root .tiles{gap:10px}
+  #ss-root .tile{padding:16px;min-height:120px;font-size:18px}
+  #ss-root .w{padding:18px}
+}
+@keyframes ss-bounce-s{30%{transform:translateY(-8px)}60%{transform:translateY(0)}80%{transform:translateY(-3px)}}
+
+/* short landscape screens (phone turned sideways) */
+@media(max-height:500px) and (orientation:landscape){
+  #ss-root .bar{height:46px}
+  #ss-root #stage{padding-bottom:96px}
+  #ss-root .dock{bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  #ss-root .panel,#ss-root .cmd{bottom:calc(84px + env(safe-area-inset-bottom,0px));max-height:64dvh}
+  #ss-root .h1{font-size:clamp(28px,5vw,40px)}
+  #ss-root #island{top:calc(6px + env(safe-area-inset-top,0px))}
+}
+
+/* touch screens: no hover, so effects must not stay stuck after a tap */
+@media(hover:none){
+  #ss-root .w:hover,#ss-root .tile:hover,#ss-root .po:hover,#ss-root .sup:hover{transform:none;box-shadow:var(--shadow)}
+  #ss-root .rg:hover{transform:perspective(700px);box-shadow:var(--shadow)}
+  #ss-root .tbtn:hover,#ss-root .btn:hover,#ss-root .chip:hover,#ss-root .avatar:hover,#ss-root .brand:hover,#ss-root .p-x:hover,#ss-root .task:hover,#ss-root .av:hover,#ss-root .bub:hover,#ss-root .lg-go:hover{transform:none}
+  #ss-root .btn:hover{filter:none}
+  #ss-root .chip:hover{background:var(--surface-2);color:var(--ink)}
+  #ss-root .w:hover::before,#ss-root .rg:hover::before,#ss-root .tile:hover::before,#ss-root .rcard:hover::before,#ss-root .po:hover::before,#ss-root .sup:hover::before{opacity:0}
+  #ss-root .rg:hover .p{filter:none}
+  #ss-root .dk:hover::after{opacity:0}
+  #ss-root #island:hover{transform:translateX(-50%)}
+}
+/* fingers are bigger than a mouse pointer: larger tap targets, and 16px text so iOS does not zoom into inputs */
+@media(pointer:coarse){
+  #ss-root .tbtn{min-height:40px;padding:8px 14px}
+  #ss-root .chip{min-height:40px;display:inline-flex;align-items:center;padding:9px 16px}
+  #ss-root .btn{min-height:44px}
+  #ss-root .seg button{padding:8px 18px}
+  #ss-root .p-x{width:36px;height:36px}
+  #ss-root .avatar{width:40px;height:40px}
+  #ss-root .lg-eye{height:38px}
+  #ss-root .cmd input,#ss-root .lg-f input{font-size:16px}
+}

@@ -484,12 +484,15 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* tooltip (charts, sparkline) */
   const tip=$('#tip');
-  track(document,'pointermove',e=>{
+  let tipT;
+  const moveTip=e=>{
    const t=e.target.closest&&e.target.closest('[data-tip]');
    if(!t){tip.classList.remove('on');return}
    tip.textContent=t.dataset.tip;tip.classList.add('on');
-   tip.style.left=Math.min(innerWidth-tip.offsetWidth-8,e.clientX+12)+'px';tip.style.top=Math.max(8,e.clientY-38)+'px';
-  });
+   tip.style.left=Math.max(8,Math.min(innerWidth-tip.offsetWidth-8,e.clientX+12))+'px';tip.style.top=Math.max(8,e.clientY-38)+'px';
+  };
+  track(document,'pointermove',moveTip);
+  track(document,'pointerdown',e=>{if(e.pointerType!=='touch')return;moveTip(e);clearTimeout(tipT);tipT=setTimeout(()=>tip.classList.remove('on'),2600)}); // no hover on a phone, so a tap shows it
 
   /* movements, history, batches (deterministic sample data) */
   function addMove(p,type,q){S.moves.unshift({p:p.id,type,q,t:hhmm(new Date()),who:S.role==='admin'?'Syahmi':'Syafiq'})}
@@ -561,7 +564,7 @@ export function mountVoiceApp(host, opts = {}) {
    if(b=e.target.closest('[data-enter]'))enter(b.dataset.enter);
    if(b=e.target.closest('[data-llang]'))setLang(S.lang==='ms'?'en':'ms');
   });
-  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();S.demo=false;S.user=null;demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
+  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.demo=false;S.user=null;demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
   function applyChrome(){
    $('#biz').textContent=L('Dapur Syahmi · Melaka outlet','Dapur Syahmi · Cawangan Melaka');
    $('#t-user').textContent=S.role==='admin'?'S':'F';$('#t-user').title=S.role==='admin'?'Syahmi · Admin':'Syafiq · '+L('Staff','Staf');
@@ -620,8 +623,12 @@ export function mountVoiceApp(host, opts = {}) {
   /* dock (replaces the sidebar) with macOS-style magnification */
   const DKG={home:['#5AC8FA','#007AFF'],stock:['#FFB340','#FF7A00'],cost:['#4CD964','#1FAE4B'],fresh:['#5EE0D0','#14A7B8'],ops:['#FF6B5E','#E5243B'],people:['#C98BF5','#8B3FD1'],rules:['#A8A8B0','#6B6B73']};
   function renderPetals(){
-   $('#dockitems').innerHTML=NAV[S.role].map(([id,en,ms,icon])=>{const g=DKG[id],b=id==='ops'&&pending().length?`<u>${pending().length}</u>`:'';
+   const di=$('#dockitems'),keep=di.scrollLeft;
+   di.innerHTML=NAV[S.role].map(([id,en,ms,icon])=>{const g=DKG[id],b=id==='ops'&&pending().length?`<u>${pending().length}</u>`:'';
     return `<button class="dk ${S.scene===id?'on':''}" data-nav="${id}" data-label="${L(en,ms)}" aria-label="${L(en,ms)}" style="background:linear-gradient(160deg,${g[0]},${g[1]})">${ic(icon,26)}${b}</button>`}).join('');
+   di.scrollLeft=keep;
+   const on=di.querySelector('.on');
+   if(on&&di.scrollWidth>di.clientWidth){const dr=di.getBoundingClientRect(),or=on.getBoundingClientRect();if(or.left<dr.left+8||or.right>dr.right-8)di.scrollLeft+=or.left-dr.left-(dr.width-or.width)/2}
   }
   $('#dockitems').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(!b)return;b.classList.remove('bounce');void b.offsetWidth;b.classList.add('bounce');go(b.dataset.nav)});
   const dockEl=$('.dock'),dockBtns=()=>$$('.dk,#orb',dockEl);
@@ -655,7 +662,7 @@ export function mountVoiceApp(host, opts = {}) {
   /* specular light, 3D tilt, cost scrubbing, haptics */
   track(document,'pointermove',e=>{
    const el=e.target.closest&&e.target.closest('.w,.rg,.tile,.rcard,.po,.sup');
-   if(el){const r=el.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
+   if(el&&e.pointerType!=='touch'){const r=el.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
     el.style.setProperty('--mx',(x*100).toFixed(0)+'%');el.style.setProperty('--my',(y*100).toFixed(0)+'%');
     if(el.classList.contains('rg')){el.style.setProperty('--ry',((x-.5)*16).toFixed(1)+'deg');el.style.setProperty('--rx',((.5-y)*16).toFixed(1)+'deg')}}
    const bn=$('#bn');if(bn){if(!bn.dataset.orig)bn.dataset.orig=bn.textContent;
@@ -673,8 +680,8 @@ export function mountVoiceApp(host, opts = {}) {
      <i class="lg-av"><svg width="44" height="44" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="#0A84FF" stroke-width="3" stroke-dasharray="52 100" stroke-linecap="round" transform="rotate(-90 14 14)"/><circle cx="14" cy="14" r="6" fill="none" stroke="#34C759" stroke-width="3" stroke-dasharray="26 100" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg></i>
      <h2 class="lg-title">${L('Sign in to SmartStock','Log masuk ke SmartStock')}</h2>
      <p class="lg-sub">Dapur Syahmi · ${L('Melaka outlet','Cawangan Melaka')}</p>
-     <label class="lg-f"><span>${L('Username or email','Nama pengguna atau e-mel')}</span><input id="lg-user" name="username" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
-     <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
+     <label class="lg-f"><span>${L('Username or email','Nama pengguna atau e-mel')}</span><input id="lg-user" name="username" autocomplete="username" enterkeyhint="next" autocapitalize="none" spellcheck="false"></label>
+     <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password" enterkeyhint="go"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
      <p class="lg-err" id="lg-err" role="alert"></p>
      <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
      <p class="lg-hint">${L('Demo accounts','Akaun demo')}: <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b></p>
@@ -741,6 +748,16 @@ export function mountVoiceApp(host, opts = {}) {
     get orderTracking(){return orderTracking}
   };
   for(const m of Object.values(sceneModules))Object.assign(SCENES,m.default(api));
+
+  /* ---- device size and on-screen keyboard ----
+   * data-device on #ss-root is phone (up to 640px), tablet (up to 1024px) or desktop. The layout itself is CSS media queries
+   * in voice.css; this attribute just names the current mode (handy when testing). --kb is the height the phone keyboard covers. */
+  const mqPhone=matchMedia('(max-width:640px)'),mqTablet=matchMedia('(max-width:1024px)');
+  const setDevice=()=>{root.dataset.device=mqPhone.matches?'phone':mqTablet.matches?'tablet':'desktop'};
+  setDevice();track(mqPhone,'change',setDevice);track(mqTablet,'change',setDevice);
+  const vv=window.visualViewport;
+  function syncKeyboard(){const kb=vv?Math.max(0,Math.round(innerHeight-vv.height-vv.offsetTop)):0;root.style.setProperty('--kb',kb+'px');root.classList.toggle('kb-open',kb>120)}
+  if(vv){track(vv,'resize',syncKeyboard);track(vv,'scroll',syncKeyboard)}
 
   /* ---- boot ---- */
   if(opts.scene&&opts.scene!=='login')S.scene=opts.scene;
