@@ -27,3 +27,15 @@ Each page branch only adds its own page file and scene file. A page whose scene 
 
 A scene file exports `function (api)` and returns `{ sceneName: () => htmlString }`. `api` gives it the shared helpers (`S` state, `L(en, ms)` for English/Malay, `P` products, `rm`, `eta`, ...).
 Voice works with the Web Speech API (Chrome or Edge, https or localhost). All data is sample data.
+
+## Phone, tablet and desktop
+
+One codebase, no separate mobile site. The browser picks the layout from the screen width (CSS media queries in `voice.css`, bottom of the file):
+
+| Device | Width | What changes |
+|---|---|---|
+| Phone | up to 640px | Full-width dock that scrolls sideways (mic orb always visible), item sheet fills the screen, one-column widgets |
+| Tablet | 641px to 1024px | 2 and 3 column home widgets, floating dock like desktop |
+| Desktop | 1025px and up | Original layout, unchanged |
+
+Touch is detected separately from width: `(hover: none)` turns off hover and 3D tilt effects, `(pointer: coarse)` makes buttons bigger. `#ss-root` gets a `data-device` attribute (`phone`, `tablet` or `desktop`) that follows the screen size, and the keyboard height is exposed as `--kb` so the typing box and login form stay above the phone keyboard.
