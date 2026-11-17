@@ -417,9 +417,9 @@ export function mountVoiceApp(host, opts = {}) {
    applyStatic();hidePanel();closeCmd();render(false);startHints();
   }
   function setRole(r){
-   if(S.role===r)return;S.role=r;S.draft=null;S.filter='all';S.scene='home';
+   if(!S.demoMode||S.role===r)return;S.role=r;S.draft=null;S.filter='all';S.scene='home';
    $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.role===r));
-   closeMenu();closeCmd();render(true);startHints();
+   closeMenu();closeCmd();render(true);startHints();applyChrome();
    panel({state:r==='admin'?L('Admin view','Paparan admin'):L('Staff view','Paparan staf'),title:r==='admin'?L('Briefing, costs and approvals.','Ringkasan, kos dan kelulusan.'):L('A simple screen. Just say what you did.','Skrin ringkas. Cakap apa yang anda buat.'),ttl:2600});
   }
   const DEMO=[['admin','Open product stock','Buka stok produk'],[0,'Show low stock','Tunjuk stok rendah'],['staff','We used 2 kg chicken','Ayam dah guna 2 kilo'],[0,'Confirm','Betul'],['admin','When will chicken run out?','Bila ayam habis?'],[0,'Order 20 kg chicken','Order 20 kilo ayam'],[0,'Confirm','Betul'],[0,'Approve','Lulus'],[0,'Why did costs rise?','Kenapa kos naik?'],[0,'Scan banana','Imbas pisang']];
@@ -564,7 +564,7 @@ export function mountVoiceApp(host, opts = {}) {
    if(b=e.target.closest('[data-enter]'))enter(b.dataset.enter);
    if(b=e.target.closest('[data-llang]'))setLang(S.lang==='ms'?'en':'ms');
   });
-  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.demo=false;S.user=null;demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
+  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.demo=false;setDemoMode(false);S.user=null;demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
   function applyChrome(){
    $('#biz').textContent=L('Dapur Syahmi · Melaka outlet','Dapur Syahmi · Cawangan Melaka');
    $('#t-user').textContent=S.role==='admin'?'S':'F';$('#t-user').title=S.role==='admin'?'Syahmi · Admin':'Syafiq · '+L('Staff','Staf');
@@ -673,7 +673,9 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* sign-in: one lock-screen style form for everyone. The role comes from the account that signs in.
    * Demo accounts (client-side only, sample data): admin / admin  and  staff / admin */
-  const ACCOUNTS=[{role:'admin',user:'admin',pass:'admin'},{role:'staff',user:'staff',pass:'staff'}];
+  const ACCOUNTS=[{role:'admin',user:'admin',pass:'admin'},{role:'staff',user:'staff',pass:'staff'},{role:'admin',user:'demo',pass:'demo',demo:true}];
+  /* Real accounts have one fixed role. Only the demo account (presentation mode) gets the Admin/Staff switch and the 1-minute demo. */
+  const setDemoMode=on=>{S.demoMode=!!on;root.classList.toggle('demo-mode',!!on);if(on)requestAnimationFrame(()=>syncSegs())};
   function renderLogin(){
    const keep=$('#lg-user')?{u:$('#lg-user').value,p:$('#lg-pass').value,f:document.activeElement&&document.activeElement.id}:null;
    $('#login').innerHTML=`<form class="lg-card" id="lg-form" novalidate>
@@ -684,7 +686,8 @@ export function mountVoiceApp(host, opts = {}) {
      <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password" enterkeyhint="go"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
      <p class="lg-err" id="lg-err" role="alert"></p>
      <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
-     <p class="lg-hint">${L('Demo accounts','Akaun demo')}: <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b></p>
+     <p class="lg-hint"><b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b></p>
+     <p class="lg-hint lg-hint2"><b>demo</b> / <b>demo</b> · ${L('presentation mode, switch between Admin and Staff','mod pembentangan, tukar antara Admin dan Staf')}</p>
     </form>
     <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
    if(keep){$('#lg-user').value=keep.u;$('#lg-pass').value=keep.p}
@@ -706,7 +709,7 @@ export function mountVoiceApp(host, opts = {}) {
    if(!acc){fail(L('Wrong username or password.','Nama pengguna atau kata laluan salah.'));return}
    err.textContent='';
    const btn=form.querySelector('.lg-go');btn.disabled=true;btn.textContent=L('Signing in…','Log masuk…');
-   setTimeout(()=>{enter(acc.role);setTimeout(renderLogin,1000)},350);
+   setTimeout(()=>{setDemoMode(acc.demo);enter(acc.role);setTimeout(renderLogin,1000)},350);
   });
 
   const _enter=enter;enter=role=>{const l=$('#login');l.classList.add('leave');setTimeout(()=>{l.classList.remove('leave');_enter(role)},600)};
@@ -761,7 +764,7 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* ---- boot ---- */
   if(opts.scene&&opts.scene!=='login')S.scene=opts.scene;
-  S.demo=false;
+  S.demo=false;S.demoMode=false;
   renderLogin();$('#login').hidden=!!S.user;applyStatic();
 
   render(true);startHints();syncSegs();

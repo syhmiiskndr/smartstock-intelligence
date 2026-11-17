@@ -509,3 +509,7 @@
   #ss-root .lg-eye{height:38px}
   #ss-root .cmd input,#ss-root .lg-f input{font-size:16px}
 }
+
+/* Admin/Staff switch and the 1-minute demo are for the demo login only; real accounts keep a fixed role */
+#ss-root:not(.demo-mode) .tools .seg,#ss-root:not(.demo-mode) #t-demo{display:none}
+#ss-root .lg-hint2{margin-top:-8px;font-size:12px;opacity:.55}
