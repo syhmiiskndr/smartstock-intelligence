@@ -12,6 +12,8 @@ export const VOICE_ROUTES = {
   people: '/people',
   rules: '/rules',
   login: '/login',
+  'login-admin': '/login/admin',
+  'login-staff': '/login/staff',
 };
 
 // The voice UI is built once and shared by every page, so the dock, Dynamic Island

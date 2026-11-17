@@ -55,7 +55,8 @@ export function mountVoiceApp(host, opts = {}) {
    alert:'M12 4l10 17H2zM12 10v5M12 18h.01',
    clockw:'M12 6v6l4 2M12 21a9 9 0 100-18 9 9 0 000 18z',
    trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
-   trend:'M3 17l6-6 4 4 8-8M15 7h6v6'
+   trend:'M3 17l6-6 4 4 8-8M15 7h6v6',
+   back:'M15 5l-7 7 7 7'
   };
   const ic=(n,s=20)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[n]}"/></svg>`;
 
@@ -560,7 +561,7 @@ export function mountVoiceApp(host, opts = {}) {
    if(b=e.target.closest('[data-enter]'))enter(b.dataset.enter);
    if(b=e.target.closest('[data-llang]'))setLang(S.lang==='ms'?'en':'ms');
   });
-  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();S.demo=false;S.user=null;demoBtn();renderLogin();$('#login').hidden=false};
+  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();S.demo=false;S.user=null;S.loginView='choose';demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
   function applyChrome(){
    $('#biz').textContent=L('Dapur Syahmi · Melaka outlet','Dapur Syahmi · Cawangan Melaka');
    $('#t-user').textContent=S.role==='admin'?'S':'F';$('#t-user').title=S.role==='admin'?'Syahmi · Admin':'Syafiq · '+L('Staff','Staf');
@@ -663,13 +664,57 @@ export function mountVoiceApp(host, opts = {}) {
   track(document,'pointerout',e=>{const el=e.target.closest&&e.target.closest('.rg');if(el&&!el.contains(e.relatedTarget)){el.style.setProperty('--rx','0deg');el.style.setProperty('--ry','0deg')}});
   track(document,'click',e=>{if(e.target.closest('button')){try{navigator.vibrate&&navigator.vibrate(6)}catch(x){}}},true);
 
-  /* sign-in: lock-screen style */
+  /* sign-in: lock-screen style. Step 1 picks Admin or Staff, step 2 is a separate login form per role.
+   * Demo accounts (client-side only, sample data): admin / admin  and  staff / admin */
+  const CRED={admin:{user:'admin',pass:'admin'},staff:{user:'staff',pass:'admin'}};
+  const LROLE=r=>({
+   admin:{grad:'linear-gradient(145deg,#5AC8FA,#007AFF)',ltr:'A',name:'Admin',sub:L('Costs, approvals and team','Kos, kelulusan dan pasukan')},
+   staff:{grad:'linear-gradient(145deg,#4CD964,#1FAE4B)',ltr:'S',name:L('Staff','Staf'),sub:L('Record stock, check freshness','Rekod stok, semak kesegaran')}
+  }[r]);
   function renderLogin(){
-   const d=new Date(),t=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),ds=d.toLocaleDateString(S.lang==='ms'?'ms-MY':'en-GB',{weekday:'long',day:'numeric',month:'long'});
-   $('#login').innerHTML=`<div><h1 class="lg-time">${t}</h1><p class="lg-date">${ds}</p></div>
-    <div class="lg-users"><button class="lg-u" data-enter="admin"><i style="background:linear-gradient(145deg,#5AC8FA,#007AFF)">S</i><b>Syahmi</b><span>Admin</span></button><button class="lg-u" data-enter="staff"><i style="background:linear-gradient(145deg,#4CD964,#1FAE4B)">F</i><b>Syafiq</b><span>${L('Staff','Staf')}</span></button></div>
-    <div class="lg-foot"><span>${L('Choose an account to sign in to Dapur Syahmi','Pilih akaun untuk log masuk ke Dapur Syahmi')}</span><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
+   const v=S.loginView||(S.loginView='choose');
+   const keep=$('#lg-user')?{u:$('#lg-user').value,p:$('#lg-pass').value,f:document.activeElement&&document.activeElement.id}:null;
+   const foot=`<div class="lg-foot"><span>${v==='choose'?L('Choose how you sign in to Dapur Syahmi','Pilih cara log masuk ke Dapur Syahmi'):'Dapur Syahmi · '+L('Melaka outlet','Cawangan Melaka')}</span><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
+   if(v==='choose'){
+    const d=new Date(),t=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),ds=d.toLocaleDateString(S.lang==='ms'?'ms-MY':'en-GB',{weekday:'long',day:'numeric',month:'long'});
+    const card=r=>{const R=LROLE(r);return `<button class="lg-u" data-lview="${r}"><i style="background:${R.grad}">${R.ltr}</i><b>${R.name}</b><span>${R.sub}</span></button>`};
+    $('#login').innerHTML=`<div><h1 class="lg-time">${t}</h1><p class="lg-date">${ds}</p></div>
+     <div class="lg-users">${card('admin')}${card('staff')}</div>${foot}`;
+    return;
+   }
+   const R=LROLE(v);
+   $('#login').innerHTML=`<form class="lg-card" id="lg-form" data-role="${v}" novalidate>
+     <button type="button" class="lg-back" data-lback="1" aria-label="${L('Back','Kembali')}">${ic('back',18)}<span>${L('Back','Kembali')}</span></button>
+     <i class="lg-av" style="background:${R.grad}">${R.ltr}</i>
+     <h2 class="lg-title">${v==='admin'?L('Admin sign in','Log masuk admin'):L('Staff sign in','Log masuk staf')}</h2>
+     <label class="lg-f"><span>${L('Username or email','Nama pengguna atau e-mel')}</span><input id="lg-user" name="username" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+     <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
+     <p class="lg-err" id="lg-err" role="alert"></p>
+     <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
+     <p class="lg-hint">${L('Demo account','Akaun demo')}: <b>${CRED[v].user}</b> / <b>${CRED[v].pass}</b></p>
+    </form>${foot}`;
+   if(keep){$('#lg-user').value=keep.u;$('#lg-pass').value=keep.p}
+   const f=keep&&keep.f&&$('#'+keep.f);
+   if(f)f.focus({preventScroll:true});
+   else if(!$('#login').hidden)setTimeout(()=>{const i=$('#lg-user');if(i)i.focus({preventScroll:true})},60);
   }
+  track(document,'click',e=>{
+   let b;
+   if(b=e.target.closest('#login [data-lview]')){S.loginView=b.dataset.lview;renderLogin();if(opts.onNavigate)opts.onNavigate('login-'+S.loginView)}
+   else if(e.target.closest('#login [data-lback]')){S.loginView='choose';renderLogin();if(opts.onNavigate)opts.onNavigate('login')}
+   else if(b=e.target.closest('#login [data-lpw]')){const i=$('#lg-pass'),on=i.type==='password';i.type=on?'text':'password';b.setAttribute('aria-pressed',on);b.textContent=on?L('Hide','Sembunyi'):L('Show','Tunjuk')}
+  });
+  track(document,'submit',e=>{
+   const form=e.target;if(!form||form.id!=='lg-form')return;
+   e.preventDefault();
+   const role=form.dataset.role,c=CRED[role],u=$('#lg-user').value.trim().toLowerCase(),p=$('#lg-pass').value,err=$('#lg-err');
+   const fail=msg=>{err.textContent=msg;form.classList.remove('shake');void form.offsetWidth;form.classList.add('shake');const i=$('#lg-pass');i.value='';i.focus()};
+   if(!u||!p){fail(L('Enter your username and password.','Masukkan nama pengguna dan kata laluan.'));return}
+   if(u!==c.user||p!==c.pass){fail(L('Wrong username or password.','Nama pengguna atau kata laluan salah.'));return}
+   err.textContent='';
+   const btn=form.querySelector('.lg-go');btn.disabled=true;btn.textContent=L('Signing in…','Log masuk…');
+   setTimeout(()=>{S.loginView='choose';enter(role);setTimeout(renderLogin,1000)},350);
+  });
   const _enter=enter;enter=role=>{const l=$('#login');l.classList.add('leave');setTimeout(()=>{l.classList.remove('leave');_enter(role)},600)};
 
 
@@ -711,7 +756,8 @@ export function mountVoiceApp(host, opts = {}) {
   for(const m of Object.values(sceneModules))Object.assign(SCENES,m.default(api));
 
   /* ---- boot ---- */
-  if(opts.scene&&opts.scene!=='login')S.scene=opts.scene;
+  if(opts.scene&&!String(opts.scene).startsWith('login'))S.scene=opts.scene;
+  else if(opts.scene){S.user=null;S.loginView=opts.scene==='login-admin'?'admin':opts.scene==='login-staff'?'staff':'choose'}
   S.demo=false;
   renderLogin();$('#login').hidden=!!S.user;applyStatic();
 
@@ -719,7 +765,11 @@ export function mountVoiceApp(host, opts = {}) {
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(syncSegs);
   return {
     show(scene) {
-      if (scene === 'login') { clearLive(); closeDrawer(); hidePanel(); S.user = null; renderLogin(); $('#login').hidden = false; return; }
+      if (scene === 'login' || scene === 'login-admin' || scene === 'login-staff') {
+        clearLive(); closeDrawer(); hidePanel(); S.user = null;
+        S.loginView = scene === 'login-admin' ? 'admin' : scene === 'login-staff' ? 'staff' : 'choose';
+        renderLogin(); $('#login').hidden = false; return;
+      }
       if (!S.user) return;
       if (S.scene !== scene) { go(scene); if (opts.onNavigate) opts.onNavigate(S.scene, true); }
     },

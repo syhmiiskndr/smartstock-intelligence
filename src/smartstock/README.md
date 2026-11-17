@@ -14,7 +14,9 @@ src/pages/*.jsx  one tiny page per route, same pattern as the other pages
 
 | Route | Page file | Scene file |
 |---|---|---|
-| `/login` | `Login.jsx` | (login overlay is in the engine) |
+| `/login` | `Login.jsx` | (login overlay is in the engine): choose Admin or Staff |
+| `/login/admin` | `LoginAdmin.jsx` | (engine) admin sign-in form, demo account `admin` / `admin` |
+| `/login/staff` | `LoginStaff.jsx` | (engine) staff sign-in form, demo account `staff` / `admin` |
 | `/` | `Home.jsx` | `scenes/home.js` |
 | `/stock` | `Stock.jsx` | `scenes/stock.js` |
 | `/cost` | `Cost.jsx` | `scenes/cost.js` |
