@@ -14,7 +14,7 @@ src/pages/*.jsx  one tiny page per route, same pattern as the other pages
 
 | Route | Page file | Scene file |
 |---|---|---|
-| `/login` | `Login.jsx` | (login overlay is in the engine): one form, the role comes from the account. Demo accounts `admin` / `admin` and `staff` / `admin` |
+| `/login` | `Login.jsx` | (login overlay is in the engine): one form, the role comes from the account. Accounts `admin` / `admin` and `staff` / `staff` have a fixed role. `demo` / `demo` is presentation mode: it shows the Admin/Staff switch and the 1-minute demo, which no other account sees |
 | `/` | `Home.jsx` | `scenes/home.js` |
 | `/stock` | `Stock.jsx` | `scenes/stock.js` |
 | `/cost` | `Cost.jsx` | `scenes/cost.js` |
