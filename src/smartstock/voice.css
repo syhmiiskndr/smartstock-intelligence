@@ -359,6 +359,31 @@
 #ss-root #login.leave{animation:ss-leave .7s cubic-bezier(.4,0,.2,1) forwards}
 @keyframes ss-leave{to{opacity:0;transform:scale(1.12);filter:blur(14px)}}
 
+/* sign in: role cards + login form (same lock-screen glass look) */
+#ss-root .lg-u span{max-width:160px;line-height:1.35}
+#ss-root .lg-card{width:min(380px,calc(100vw - 32px));box-sizing:border-box;padding:24px 24px 20px;border-radius:28px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);-webkit-backdrop-filter:blur(28px) saturate(1.4);backdrop-filter:blur(28px) saturate(1.4);box-shadow:0 24px 60px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.25);display:flex;flex-direction:column;align-items:stretch;gap:14px;text-align:left;animation:ss-rise .6s var(--spring) both}
+@keyframes ss-rise{from{opacity:0;transform:translateY(18px) scale(.96)}}
+#ss-root .lg-back{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;background:none;border:0;color:rgba(255,255,255,.75);font:500 14px var(--font);padding:2px 8px 2px 0;cursor:pointer}
+#ss-root .lg-back:hover{color:#fff}
+#ss-root .lg-av{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;align-self:center;font:600 30px var(--font);font-style:normal;box-shadow:0 10px 30px rgba(0,0,0,.4),inset 0 0 0 1px rgba(255,255,255,.3)}
+#ss-root .lg-title{font:700 24px/1.1 var(--font);letter-spacing:-.02em;text-align:center;margin:0 0 4px}
+#ss-root .lg-f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500}
+#ss-root .lg-f>span{opacity:.8}
+#ss-root .lg-f input{width:100%;box-sizing:border-box;height:48px;padding:0 14px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.12);color:#fff;font:500 16px var(--font);outline:none;transition:border-color .2s,background .2s,box-shadow .2s}
+#ss-root .lg-f input:focus{border-color:#5AC8FA;background:rgba(255,255,255,.16);box-shadow:0 0 0 4px rgba(10,132,255,.35)}
+#ss-root .lg-pw{position:relative}
+#ss-root .lg-pw input{padding-right:72px}
+#ss-root .lg-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);height:34px;padding:0 10px;border:0;border-radius:10px;background:rgba(255,255,255,.14);color:#fff;font:500 13px var(--font);cursor:pointer}
+#ss-root .lg-err{min-height:18px;margin:-4px 0 0;font-size:13px;color:#FF8A80;text-align:center}
+#ss-root .lg-go{height:50px;border:0;border-radius:16px;color:#fff;font:600 16px var(--font);cursor:pointer;background:linear-gradient(145deg,#32ADFF,#007AFF);box-shadow:0 8px 22px rgba(0,122,255,.45);transition:transform .4s var(--spring),opacity .2s}
+#ss-root .lg-card[data-role=staff] .lg-go{background:linear-gradient(145deg,#4CD964,#1FAE4B);box-shadow:0 8px 22px rgba(31,174,75,.45)}
+#ss-root .lg-go:hover{transform:scale(1.02)}#ss-root .lg-go:active{transform:scale(.97)}
+#ss-root .lg-go:disabled{opacity:.7;pointer-events:none}
+#ss-root .lg-hint{margin:0;font-size:12.5px;opacity:.65;text-align:center}
+#ss-root .lg-hint b{font-weight:600}
+#ss-root .lg-card.shake{animation:ss-shake .4s}
+@keyframes ss-shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+
 @media(prefers-reduced-motion:reduce){#ss-root *{animation:none!important;transition-duration:.01ms!important}}
 
 /* level bars (replace rings on stock cards) */
