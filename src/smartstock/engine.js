@@ -666,7 +666,7 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* sign-in: one lock-screen style form for everyone. The role comes from the account that signs in.
    * Demo accounts (client-side only, sample data): admin / admin  and  staff / admin */
-  const ACCOUNTS=[{role:'admin',user:'admin',pass:'admin'},{role:'staff',user:'staff',pass:'admin'}];
+  const ACCOUNTS=[{role:'admin',user:'admin',pass:'admin'},{role:'staff',user:'staff',pass:'staff'}];
   function renderLogin(){
    const keep=$('#lg-user')?{u:$('#lg-user').value,p:$('#lg-pass').value,f:document.activeElement&&document.activeElement.id}:null;
    $('#login').innerHTML=`<form class="lg-card" id="lg-form" novalidate>
@@ -677,7 +677,7 @@ export function mountVoiceApp(host, opts = {}) {
      <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
      <p class="lg-err" id="lg-err" role="alert"></p>
      <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
-     <p class="lg-hint">${L('Demo accounts','Akaun demo')}: <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>admin</b></p>
+     <p class="lg-hint">${L('Demo accounts','Akaun demo')}: <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b></p>
     </form>
     <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
    if(keep){$('#lg-user').value=keep.u;$('#lg-pass').value=keep.p}
