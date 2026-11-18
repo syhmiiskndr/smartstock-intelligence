@@ -5,6 +5,7 @@ import { mountVoiceApp } from './engine';
 // Scene name -> route. A page file for each route lives in src/pages (Home.jsx, Stock.jsx, ...).
 export const VOICE_ROUTES = {
   home: '/',
+  analytics: '/analytics',
   stock: '/stock',
   cost: '/cost',
   fresh: '/fresh',

@@ -88,6 +88,7 @@ export function mountVoiceApp(host, opts = {}) {
   S.notes=[];S.range=7;S.orders=[];S.user=null;S.drawer=null;
   S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false};
   S.moves=[{p:'ayam',type:'usage',q:3,t:'08:40',who:'Syafiq'},{p:'susu',type:'receive',q:20,t:'07:55',who:'Hakim'},{p:'ayam',type:'receive',q:20,t:'Yesterday',who:'Hakim'},{p:'telur',type:'usage',q:30,t:'09:10',who:'Syafiq'},{p:'ayam',type:'usage',q:4,t:'10:25',who:'Syafiq'}];return S})());
+  if(!S.an)S.an={metric:'cost',range:30,cmp:true,fc:true,cat:null};
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
@@ -96,7 +97,7 @@ export function mountVoiceApp(host, opts = {}) {
   const isOwner=()=>S.role==='owner';
   const isMgr=()=>S.role==='owner'||S.role==='admin';
   const canFin=()=>S.role==='owner'||(S.role==='admin'&&!!S.rules.adminFinance);
-  const ALLOW={owner:['home','stock','cost','fresh','ops','people','rules'],admin:['home','stock','fresh','ops','people'],staff:['home','stock','fresh']};
+  const ALLOW={owner:['home','analytics','stock','cost','fresh','ops','people','rules'],admin:['home','stock','fresh','ops','people'],staff:['home','stock','fresh']};
   const allowed=sc=>(ALLOW[S.role]||[]).includes(sc)||(sc==='cost'&&canFin());
   const who=()=>({owner:'Syahmi',admin:'Aina',staff:'Syafiq'})[S.role]||'Syafiq';
   const roleName=r=>r==='owner'?L('Owner','Pemilik'):r==='admin'?'Admin':L('Staff','Staf');
@@ -174,7 +175,7 @@ export function mountVoiceApp(host, opts = {}) {
   });
 
   /* petals */
-  const NAVALL=[['home','Home','Utama','home'],['stock','Stock','Stok','box'],['cost','Cost','Kos','coin'],['fresh','Fresh','Segar','leaf'],['ops','Approve','Lulus','check'],['people','People','Orang','users'],['rules','Rules','Tetapan','sliders']];
+  const NAVALL=[['home','Home','Utama','home'],['analytics','Analytics','Analitik','trend'],['stock','Stock','Stok','box'],['cost','Cost','Kos','coin'],['fresh','Fresh','Segar','leaf'],['ops','Approve','Lulus','check'],['people','People','Orang','users'],['rules','Rules','Tetapan','sliders']];
   const navList=()=>NAVALL.filter(n=>allowed(n[0]));
 
   function openMenu(){closeCmd();$('#petals').classList.add('open');$('#scrim').hidden=false;$('#b-menu').setAttribute('aria-pressed','true')}
@@ -259,7 +260,7 @@ export function mountVoiceApp(host, opts = {}) {
   }
   const V={usage:/\b(guna|digunakan|used|use|potong|keluarkan)\b/,receive:/\b(terima|receive|received|receiving|masuk|tambah|restock)\b/,order:/\b(order|tempah|pesan|beli|purchase)\b/,waste:/\b(buang|waste|wasted|rosak|basi|spoiled)\b/};
   const YES=/\b(ya|yes|betul|ok|okay|confirm|setuju|boleh|sahkan|correct)\b/, NO=/\b(tak|tidak|no|batal|cancel|salah|ulang)\b/;
-  const NAVR=[['home',/\b(utama|home|dashboard|balik|mula)\b/],['stock',/\b(stok|stock|produk|product|inventori|inventory|barang)\b/],['cost',/\b(kos|cost|kewangan|belanja)\b/],
+  const NAVR=[['analytics',/\b(analytics|analitik|analisis|analysis|trend|graf|chart|ramalan|forecast)\b/],['home',/\b(utama|home|dashboard|balik|mula)\b/],['stock',/\b(stok|stock|produk|product|inventori|inventory|barang)\b/],['cost',/\b(kos|cost|kewangan|belanja)\b/],
    ['fresh',/\b(segar|fresh|freshness|kesegaran|imbas|scan|sisa|waste)\b/],['ops',/\b(lulus|kelulusan|approve|approval|approvals|tindakan|operasi|operations)\b/],['rules',/\b(rules|automation|settings|tetapan|automasi|peraturan)\b/],['people',/\b(pasukan|team|staf|staff|pembekal|supplier|suppliers|orang|people)\b/]];
   const navName=id=>{const n=NAVALL.find(x=>x[0]===id);return n?L(n[1],n[2]).toLowerCase():id};
   const INTENT={order:['Order','Order'],usage:['Use stock','Guna stok'],receive:['Receive stock','Terima stok'],waste:['Report waste','Lapor sisa']};
@@ -501,6 +502,18 @@ export function mountVoiceApp(host, opts = {}) {
    tip.style.left=Math.max(8,Math.min(innerWidth-tip.offsetWidth-8,e.clientX+12))+'px';tip.style.top=Math.max(8,e.clientY-38)+'px';
   };
   track(document,'pointermove',moveTip);
+  /* analytics chart: crosshair and readout follow the pointer (mouse or finger) without redrawing */
+  const anScrub=e=>{
+   const svg=e.target.closest&&e.target.closest('#stage .an-main');if(!svg)return;
+   const d=svg.dataset,W=+d.w,pl=+d.pl,cw=+d.cw,pt=+d.pt,ph=+d.ph,mx=+d.max,n=+d.n,m=d.m;
+   const vals=d.vals.split(',').map(Number),prev=d.prev?d.prev.split(',').map(Number):null,labs=d.labs.split('|');
+   const r=svg.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W;
+   const i=clamp(Math.round((x-pl)/cw*(vals.length-1)),0,vals.length-1),px=pl+i*cw/(vals.length-1),py=pt+(1-vals[i]/mx)*ph;
+   const cx=svg.querySelector('.an-cx'),cd=svg.querySelector('.an-cd');cx.setAttribute('x1',px);cx.setAttribute('x2',px);cx.setAttribute('opacity',.5);cd.setAttribute('cx',px);cd.setAttribute('cy',py);cd.setAttribute('opacity',1);
+   const f=v=>m==='usage'?Math.round(v)+' '+L('units','unit'):rm0(v),fc=i>=n,avg=vals.slice(0,n).reduce((a,b)=>a+b,0)/n,dv=Math.round((vals[i]/avg-1)*100);
+   $('#an-read').innerHTML=`<b>${f(vals[i])}</b><span>${labs[i]}${fc?' · '+L('forecast, an estimate','ramalan, anggaran'):''}</span><span class="pill ${dv>10?'warn':''}">${dv>=0?'+':''}${dv}% ${L('vs average','dari purata')}</span>${prev&&i<n?`<span class="pill">${L('previous','sebelum')} ${f(prev[i])}</span>`:''}`;
+  };
+  track(document,'pointermove',anScrub);track(document,'pointerdown',anScrub);
   track(document,'pointerdown',e=>{if(e.pointerType!=='touch')return;moveTip(e);clearTimeout(tipT);tipT=setTimeout(()=>tip.classList.remove('on'),2600)}); // no hover on a phone, so a tap shows it
 
   /* movements, history, batches (deterministic sample data) */
@@ -553,6 +566,10 @@ export function mountVoiceApp(host, opts = {}) {
   track(document,'click',e=>{
    let b;
    if(b=e.target.closest('#stage [data-range]')){S.range=+b.dataset.range;refresh()}
+   if(b=e.target.closest('#stage [data-an-metric]')){S.an.metric=b.dataset.anMetric;refresh()}
+   if(b=e.target.closest('#stage [data-an-range]')){S.an.range=+b.dataset.anRange;refresh()}
+   if(b=e.target.closest('#stage [data-an-toggle]')){const k=b.dataset.anToggle;S.an[k]=!S.an[k];refresh()}
+   if(b=e.target.closest('#stage [data-an-cat]')){const c=b.dataset.anCat;S.an.cat=S.an.cat===c?null:c;refresh()}
    if(b=e.target.closest('#stage [data-rule]')){const k=b.dataset.rule;S.rules[k]=!S.rules[k];b.setAttribute('aria-checked',S.rules[k])}
   });
   track(document,'input',e=>{if(e.target.id==='limit'){S.rules.limit=+e.target.value;$('#limit-v').textContent='RM '+S.rules.limit}});
@@ -630,7 +647,7 @@ export function mountVoiceApp(host, opts = {}) {
   }
 
   /* dock (replaces the sidebar) with macOS-style magnification */
-  const DKG={home:['#5AC8FA','#007AFF'],stock:['#FFB340','#FF7A00'],cost:['#4CD964','#1FAE4B'],fresh:['#5EE0D0','#14A7B8'],ops:['#FF6B5E','#E5243B'],people:['#C98BF5','#8B3FD1'],rules:['#A8A8B0','#6B6B73']};
+  const DKG={home:['#5AC8FA','#007AFF'],analytics:['#FF8AD8','#E5359B'],stock:['#FFB340','#FF7A00'],cost:['#4CD964','#1FAE4B'],fresh:['#5EE0D0','#14A7B8'],ops:['#FF6B5E','#E5243B'],people:['#C98BF5','#8B3FD1'],rules:['#A8A8B0','#6B6B73']};
   function renderPetals(){
    const di=$('#dockitems'),keep=di.scrollLeft;
    di.innerHTML=navList().map(([id,en,ms,icon])=>{const g=DKG[id],b=id==='ops'&&pending().length?`<u>${pending().length}</u>`:'';
