@@ -86,12 +86,20 @@ export function mountVoiceApp(host, opts = {}) {
    audit:[],fresh:{res:null,scanning:false,n:0},rid:2
   };
   S.notes=[];S.range=7;S.orders=[];S.user=null;S.drawer=null;
-  S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15};
+  S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false};
   S.moves=[{p:'ayam',type:'usage',q:3,t:'08:40',who:'Syafiq'},{p:'susu',type:'receive',q:20,t:'07:55',who:'Hakim'},{p:'ayam',type:'receive',q:20,t:'Yesterday',who:'Hakim'},{p:'telur',type:'usage',q:30,t:'09:10',who:'Syafiq'},{p:'ayam',type:'usage',q:4,t:'10:25',who:'Syafiq'}];return S})());
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
   const pending=()=>S.requests.filter(r=>r.status==='pending');
+  /* Roles: owner (Intelligence layer: finance, rules, everything), admin (Operational layer: runs the day, finance only if the owner allows), staff (records stock). Client-side only; real enforcement is Supabase RLS. */
+  const isOwner=()=>S.role==='owner';
+  const isMgr=()=>S.role==='owner'||S.role==='admin';
+  const canFin=()=>S.role==='owner'||(S.role==='admin'&&!!S.rules.adminFinance);
+  const ALLOW={owner:['home','stock','cost','fresh','ops','people','rules'],admin:['home','stock','fresh','ops','people'],staff:['home','stock','fresh']};
+  const allowed=sc=>(ALLOW[S.role]||[]).includes(sc)||(sc==='cost'&&canFin());
+  const who=()=>({owner:'Syahmi',admin:'Aina',staff:'Syafiq'})[S.role]||'Syafiq';
+  const roleName=r=>r==='owner'?L('Owner','Pemilik'):r==='admin'?'Admin':L('Staff','Staf');
   const eta=p=>{const h=p.qty/p.avg*24;return h<1?L('under 1 hour','kurang 1 jam'):h<36?Math.round(h)+L(' hours',' jam'):(h/24).toFixed(1)+L(' days',' hari')};
   const suggest=p=>Math.max(10,Math.round((p.avg*2.5-p.qty)/10)*10);
   const EX={
@@ -100,7 +108,8 @@ export function mountVoiceApp(host, opts = {}) {
    en:{admin:['Open product stock','Show low stock','Why did costs rise?','When will chicken run out?','Order 20 kg chicken','Approve','Scan banana'],
        staff:['We used 2 kg chicken','Receive 10 litres milk','Waste 1 kg banana','Scan banana','Open stock']}
   };
-  const examples=()=>EX[S.lang][S.role];
+  EX.ms.owner=EX.ms.admin;EX.en.owner=EX.en.admin;
+  const examples=()=>EX[S.lang][S.role].filter(x=>canFin()||!/kos|cost/i.test(x));
 
   /* ---- scenes ---- */
   const greet=()=>{const h=new Date().getHours();return h<11?L('Good morning','Selamat pagi'):h<15?L('Good afternoon','Selamat tengah hari'):h<19?L('Good evening','Selamat petang'):L('Good evening','Selamat malam')};
@@ -139,11 +148,11 @@ export function mountVoiceApp(host, opts = {}) {
    renderPetals();
   }
   function go(scene){
-   if(S.role==='staff'&&!['home','stock','fresh'].includes(scene))return deny();
+   if(!allowed(scene))return deny();
    S.scene=scene;closeMenu();render(true);if(opts.onNavigate)opts.onNavigate(scene);
   }
   function deny(){
-   panel({state:L('No access','Tiada akses'),tone:'bad',title:L('This screen is for admins only.','Skrin ini untuk admin sahaja.'),chips:[{label:L('Open stock','Buka stok'),say:L('Open stock','Buka stok')}],ttl:5000});
+   panel({state:L('No access','Tiada akses'),tone:'bad',title:(S.role==='staff'?L('This screen is for admins only.','Skrin ini untuk admin sahaja.'):L('This screen needs the owner or a finance permission.','Skrin ini perlukan pemilik atau kebenaran kewangan.')),chips:[{label:L('Open stock','Buka stok'),say:L('Open stock','Buka stok')}],ttl:5000});
   }
   function panel(o){
    clearTimeout(panelTimer);acts=[];
@@ -165,8 +174,8 @@ export function mountVoiceApp(host, opts = {}) {
   });
 
   /* petals */
-  const NAV={admin:[['home','Home','Utama','home'],['stock','Stock','Stok','box'],['cost','Cost','Kos','coin'],['fresh','Fresh','Segar','leaf'],['ops','Approve','Lulus','check'],['people','People','Orang','users'],['rules','Rules','Tetapan','sliders']],
-             staff:[['home','Home','Utama','home'],['stock','Stock','Stok','box'],['fresh','Fresh','Segar','leaf']]};
+  const NAVALL=[['home','Home','Utama','home'],['stock','Stock','Stok','box'],['cost','Cost','Kos','coin'],['fresh','Fresh','Segar','leaf'],['ops','Approve','Lulus','check'],['people','People','Orang','users'],['rules','Rules','Tetapan','sliders']];
+  const navList=()=>NAVALL.filter(n=>allowed(n[0]));
 
   function openMenu(){closeCmd();$('#petals').classList.add('open');$('#scrim').hidden=false;$('#b-menu').setAttribute('aria-pressed','true')}
   function closeMenu(){$('#petals').classList.remove('open');$('#scrim').hidden=true;$('#b-menu').setAttribute('aria-pressed','false')}
@@ -229,7 +238,7 @@ export function mountVoiceApp(host, opts = {}) {
   const hhmm=d=>d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   function showAudit(){
    const cls=s=>/Rejected|Not allowed|Not understood|Ditolak|Tidak/.test(s)?'bad':/Awaiting|Menunggu/.test(s)?'warn':'ok';
-   const rows=S.audit.length?S.audit.slice(0,8).map(a=>`<div><time>${hhmm(a.t)}</time><span><b>${esc(a.text)}</b><br><span class="say" style="margin:0">${a.who==='admin'?'Admin':L('Staff','Staf')} · ${esc(a.intent)}</span></span><span class="pill ${cls(a.status)}">${esc(a.status)}</span></div>`).join(''):`<p class="p-body">${L('No commands yet. Every voice command is recorded here.','Belum ada arahan. Setiap arahan suara akan direkod di sini.')}</p>`;
+   const rows=S.audit.length?S.audit.slice(0,8).map(a=>`<div><time>${hhmm(a.t)}</time><span><b>${esc(a.text)}</b><br><span class="say" style="margin:0">${roleName(a.who)} · ${esc(a.intent)}</span></span><span class="pill ${cls(a.status)}">${esc(a.status)}</span></div>`).join(''):`<p class="p-body">${L('No commands yet. Every voice command is recorded here.','Belum ada arahan. Setiap arahan suara akan direkod di sini.')}</p>`;
    panel({state:L('Command trail','Jejak arahan'),title:L('Who said what, and what happened','Siapa cakap apa, dan apa jadi'),html:`<div class="log">${rows}</div>`,persist:true});
   }
 
@@ -252,7 +261,7 @@ export function mountVoiceApp(host, opts = {}) {
   const YES=/\b(ya|yes|betul|ok|okay|confirm|setuju|boleh|sahkan|correct)\b/, NO=/\b(tak|tidak|no|batal|cancel|salah|ulang)\b/;
   const NAVR=[['home',/\b(utama|home|dashboard|balik|mula)\b/],['stock',/\b(stok|stock|produk|product|inventori|inventory|barang)\b/],['cost',/\b(kos|cost|kewangan|belanja)\b/],
    ['fresh',/\b(segar|fresh|freshness|kesegaran|imbas|scan|sisa|waste)\b/],['ops',/\b(lulus|kelulusan|approve|approval|approvals|tindakan|operasi|operations)\b/],['rules',/\b(rules|automation|settings|tetapan|automasi|peraturan)\b/],['people',/\b(pasukan|team|staf|staff|pembekal|supplier|suppliers|orang|people)\b/]];
-  const navName=id=>{const n=NAV.admin.find(x=>x[0]===id);return n?L(n[1],n[2]).toLowerCase():id};
+  const navName=id=>{const n=NAVALL.find(x=>x[0]===id);return n?L(n[1],n[2]).toLowerCase():id};
   const INTENT={order:['Order','Order'],usage:['Use stock','Guna stok'],receive:['Receive stock','Terima stok'],waste:['Report waste','Lapor sisa']};
 
   function run(raw,src){
@@ -274,16 +283,16 @@ export function mountVoiceApp(host, opts = {}) {
    }
    // approvals
    if(!navVerb&&/\b(lulus|luluskan|approve|approved)\b/.test(t)&&pending().length||/\b(tolak|reject|decline)\b/.test(t)){
-    const ok=!/\b(tolak|reject|decline)\b/.test(t);log(text,ok?L('Approve','Lulus'):L('Reject','Tolak'),S.role==='admin'?L('Done','Dilaksana'):L('Not allowed','Tidak dibenarkan'));return decide(ok,text);
+    const ok=!/\b(tolak|reject|decline)\b/.test(t);log(text,ok?L('Approve','Lulus'):L('Reject','Tolak'),isMgr()?L('Done','Dilaksana'):L('Not allowed','Tidak dibenarkan'));return decide(ok,text);
    }
    // questions
    if(/\b(nilai|worth|value)\b/.test(t)&&/\b(stok|stock|inventori|inventory)\b/.test(t)){
     log(text,L('Stock value question','Soalan nilai stok'),L('Answered','Dijawab'));
-    if(S.role!=='admin')return deny();
+    if(!canFin())return deny();
     return panel({state:L('Answer','Jawapan'),said:text,title:L('Stock value right now','Nilai stok sekarang'),big:rm0(stockValue()),facts:[[L('items','item'),String(P.length)],[L('method','kaedah'),L('balance × unit cost','baki × kos seunit')]],chips:[{label:L('Open stock','Buka stok'),say:L('Open stock','Buka stok')}]});
    }
    if(/\b(kenapa|mengapa|why)\b/.test(t)&&/\b(kos|cost|costs)\b/.test(t)){
-    log(text,L('Cost question','Soalan kos'),L('Answered','Dijawab'));if(S.role!=='admin')return deny();
+    log(text,L('Cost question','Soalan kos'),L('Answered','Dijawab'));if(!canFin())return deny();
     const dr=P.map(p=>({p,x:(S.use[p.id]-p.avg)*p.cost})).sort((a,b)=>b.x-a.x)[0], pct=Math.round((costToday()/costAvg()-1)*100);
     return panel({state:L('Answer','Jawapan'),said:text,title:L(`${pn(dr.p)} pushes cost up the most`,`${pn(dr.p)} paling menaikkan kos`),big:'+'+rm0(dr.x),facts:[[L('used today','guna hari ini'),`${fq(S.use[dr.p.id])} ${U(dr.p.unit)}`],[L('usual','biasa'),`${dr.p.avg} ${U(dr.p.unit)}`],[L('total cost','jumlah kos'),`${pct>=0?'+':''}${pct}%`]],chips:[{label:L('Open cost','Buka kos'),say:L('Open cost','Buka kos')}],ttl:14000});
    }
@@ -298,7 +307,7 @@ export function mountVoiceApp(host, opts = {}) {
    // navigation
    for(const [sc,re] of NAVR){
     if(re.test(t)){
-     if(S.role==='staff'&&!['home','stock','fresh'].includes(sc)){log(text,L('Open ','Buka ')+navName(sc),L('Not allowed','Tidak dibenarkan'));return deny()}
+     if(!allowed(sc)){log(text,L('Open ','Buka ')+navName(sc),L('Not allowed','Tidak dibenarkan'));return deny()}
      log(text,L('Open ','Buka ')+navName(sc),L('Navigated','Navigasi'));if(sc==='stock')S.filter='all';
      const auto=sc==='fresh'&&/\b(imbas|scan)\b/.test(t);
      go(sc);if(auto)setTimeout(scan,900);return;
@@ -329,7 +338,7 @@ export function mountVoiceApp(host, opts = {}) {
    if(!S.rules.confirm&&(d.type==='usage'||d.type==='receive'))return commit();
    const amt=q*p.cost, sign=d.type==='receive'?'+':d.type==='order'?'':'−';
    const lvl=d.type==='order'?L('Needs admin approval','Perlu kelulusan admin'):d.type==='waste'&&amt>S.rules.limit?L(`Over RM ${S.rules.limit}, needs approval`,`Melebihi RM ${S.rules.limit}, perlu kelulusan`):'';
-   const facts=d.type==='order'?[[L('estimate','anggaran'),rm(amt)],[L('supplier','pembekal'),p.sup]]:[[L('new balance','baki baru'),`${fq(d.type==='receive'?p.qty+q:p.qty-q)} ${U(p.unit)}`],...(S.role==='admin'?[[L('cost','kos'),rm(amt)]]:[])];
+   const facts=d.type==='order'?[[L('estimate','anggaran'),rm(amt)],[L('supplier','pembekal'),p.sup]]:[[L('new balance','baki baru'),`${fq(d.type==='receive'?p.qty+q:p.qty-q)} ${U(p.unit)}`],...(canFin()?[[L('cost','kos'),rm(amt)]]:[])];
    panel({state:lvl||L('Confirm','Sahkan'),tone:lvl?'warn':'',said:d.said,title:VERB()[d.type]+' '+pn(p).toLowerCase(),big:`${sign}${fq(q)} ${U(p.unit)}`,facts,
     actions:[{label:L('Redo','Ulang'),fn:()=>{S.draft=null;hidePanel()}},{label:d.type==='order'&&S.role==='staff'?L('Send to admin','Hantar kepada admin'):L('Confirm','Betul'),kind:'ok',fn:commit}],bigBtn:true,persist:true,html:`<span class="say" style="margin-top:12px">${L('or say','atau sebut')} <q>${L('confirm','betul')}</q></span>`});
   }
@@ -341,19 +350,19 @@ export function mountVoiceApp(host, opts = {}) {
     const crossed=before>p.reorder&&p.qty<=p.reorder&&S.rules.lowAlert;
     if(crossed)notify('bad',L('Low stock: '+pn(p),'Stok rendah: '+pn(p)),L(`${fq(p.qty)} ${U(p.unit)} left. Alert sent to admin.`,`Baki ${fq(p.qty)} ${U(p.unit)}. Amaran dihantar kepada admin.`));
     S.pulse=p.id;refresh();
-    panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`${pn(p)}: ${fq(p.qty)} ${U(p.unit)} left`,`${pn(p)}: baki ${fq(p.qty)} ${U(p.unit)}`),body:S.role==='admin'?L(`Cost today ${rm(costToday())}.`,`Kos hari ini ${rm(costToday())}.`):L('Thanks. Cost is calculated automatically.','Terima kasih. Kos dikira automatik.'),
-     html:crossed?`<div class="row"><span class="pill bad">${ic('alert',13)}${L('Low-stock alert sent to admin','Amaran stok rendah dihantar kepada admin')}</span></div>`:'',chips:crossed&&S.role==='admin'?[{label:`Order ${suggest(p)} ${U(p.unit)}`,say:orderSay(p)}]:[],ttl:10000});
+    panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`${pn(p)}: ${fq(p.qty)} ${U(p.unit)} left`,`${pn(p)}: baki ${fq(p.qty)} ${U(p.unit)}`),body:canFin()?L(`Cost today ${rm(costToday())}.`,`Kos hari ini ${rm(costToday())}.`):L('Thanks. Cost is calculated automatically.','Terima kasih. Kos dikira automatik.'),
+     html:crossed?`<div class="row"><span class="pill bad">${ic('alert',13)}${L('Low-stock alert sent to admin','Amaran stok rendah dihantar kepada admin')}</span></div>`:'',chips:crossed&&isMgr()?[{label:`Order ${suggest(p)} ${U(p.unit)}`,say:orderSay(p)}]:[],ttl:10000});
    }else if(d.type==='receive'){
     p.qty=r2(p.qty+q);tick('receive:'+p.id);addMove(p,'receive',q);receivePO(p);S.pulse=p.id;refresh();
     panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`${pn(p)}: ${fq(p.qty)} ${U(p.unit)} now`,`${pn(p)}: baki ${fq(p.qty)} ${U(p.unit)}`),body:L('New batch added with an expiry date.','Kelompok baru ditambah dengan tarikh luput.'),ttl:7000});
    }else if(d.type==='waste'){
-    if(amt>S.rules.limit){addReq({kind:'writeoff',item:p.id,qty:q,amount:amt,by:S.role==='admin'?'Syahmi':'staff',rkey:'rep'});
+    if(amt>S.rules.limit){addReq({kind:'writeoff',item:p.id,qty:q,amount:amt,by:isMgr()?who():'staff',rkey:'rep'});
      panel({state:L('Awaiting approval','Menunggu kelulusan'),tone:'warn',title:L('Sent to admin.','Dihantar kepada admin.'),body:L(`${rm(amt)} is above the automatic write-off limit.`,`${rm(amt)} melebihi had tulis-off automatik.`),ttl:7000})}
     else{p.qty=r2(p.qty-q);addMove(p,'waste',q);S.waste.push({n:pn(p),amt});S.pulse=p.id;refresh();panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`Waste logged: ${fq(q)} ${U(p.unit)} ${n}.`,`Sisa ${fq(q)} ${U(p.unit)} ${n} direkod.`),body:L(`Waste cost ${rm(amt)}.`,`Kos sisa ${rm(amt)}.`),ttl:7000})}
    }else if(d.type==='order'){
     const dup=pending().find(r=>r.kind==='order'&&r.item===p.id);
-    if(!dup)addReq({kind:'order',item:p.id,qty:q,amount:amt,supplier:p.sup,by:S.role==='admin'?'Syahmi':'staff',rkey:'low'});
-    if(S.role==='admin'){go('ops');setTimeout(()=>panel({state:dup?L('Already waiting','Sudah menunggu'):L('Awaiting approval','Menunggu kelulusan'),tone:'warn',title:L(`The ${n} order is on the top card.`,`Order ${n} ada di kad atas.`),ttl:5000}),900)}
+    if(!dup)addReq({kind:'order',item:p.id,qty:q,amount:amt,supplier:p.sup,by:isMgr()?who():'staff',rkey:'low'});
+    if(isMgr()){go('ops');setTimeout(()=>panel({state:dup?L('Already waiting','Sudah menunggu'):L('Awaiting approval','Menunggu kelulusan'),tone:'warn',title:L(`The ${n} order is on the top card.`,`Order ${n} ada di kad atas.`),ttl:5000}),900)}
     else panel({state:L('Sent','Dihantar'),tone:'ok',title:L('Order suggestion sent to admin.','Cadangan order dihantar kepada admin.'),ttl:6000});
    }
   }
@@ -361,7 +370,7 @@ export function mountVoiceApp(host, opts = {}) {
   function refresh(){render(false);if(S.drawer)drawDrawer()}
 
   function decide(ok,said){
-   if(S.role!=='admin')return panel({state:L('No access','Tiada akses'),tone:'bad',title:L('Only admins can approve.','Hanya admin boleh meluluskan.'),ttl:4000});
+   if(!isMgr())return panel({state:L('No access','Tiada akses'),tone:'bad',title:L('Only admins can approve.','Hanya admin boleh meluluskan.'),ttl:4000});
    const r=pending()[0];
    if(!r)return panel({state:L('None','Tiada'),title:L('Nothing is waiting for approval.','Tiada kelulusan menunggu.'),ttl:3000});
    r.status=ok?'approved':'rejected';
@@ -391,8 +400,8 @@ export function mountVoiceApp(host, opts = {}) {
 
   function speakBrief(){
    const low=P.filter(p=>p.qty<=p.reorder);
-   const txt=L(`${greet()}, Syahmi. ${low.length?low.map(p=>`${pn(p)} is almost out, about ${eta(p)} left.`).join(' '):'Stock levels are healthy.'} Cost today is ${Math.round(costToday())} ringgit.`,
-    `${greet()}, Syahmi. ${low.length?low.map(p=>`${pn(p)} hampir habis, cukup ${eta(p)}.`).join(' '):'Stok semua baik.'} Kos hari ini ${Math.round(costToday())} ringgit.`);
+   const txt=L(`${greet()}, ${who()}. ${low.length?low.map(p=>`${pn(p)} is almost out, about ${eta(p)} left.`).join(' '):'Stock levels are healthy.'} Cost today is ${Math.round(costToday())} ringgit.`,
+    `${greet()}, ${who()}. ${low.length?low.map(p=>`${pn(p)} hampir habis, cukup ${eta(p)}.`).join(' '):'Stok semua baik.'} Kos hari ini ${Math.round(costToday())} ringgit.`);
    try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang=S.lang==='ms'?'ms-MY':'en-US';speechSynthesis.speak(u)}catch(e){}
    panel({state:L('Daily briefing','Ringkasan harian'),title:txt,ttl:12000});
   }
@@ -420,9 +429,9 @@ export function mountVoiceApp(host, opts = {}) {
    if(!S.demoMode||S.role===r)return;S.role=r;S.draft=null;S.filter='all';S.scene='home';
    $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.role===r));
    closeMenu();closeCmd();render(true);startHints();applyChrome();
-   panel({state:r==='admin'?L('Admin view','Paparan admin'):L('Staff view','Paparan staf'),title:r==='admin'?L('Briefing, costs and approvals.','Ringkasan, kos dan kelulusan.'):L('A simple screen. Just say what you did.','Skrin ringkas. Cakap apa yang anda buat.'),ttl:2600});
+   panel({state:r==='owner'?L('Owner view','Paparan pemilik'):r==='admin'?L('Admin view','Paparan admin'):L('Staff view','Paparan staf'),title:r==='owner'?L('Action Centre: health, money and what needs a decision.','Pusat Tindakan: kesihatan, wang dan keputusan.'):r==='admin'?L('Operations board: tasks, approvals and deliveries.','Papan operasi: tugas, kelulusan dan penghantaran.'):L('A simple screen. Just say what you did.','Skrin ringkas. Cakap apa yang anda buat.'),ttl:2600});
   }
-  const DEMO=[['admin','Open product stock','Buka stok produk'],[0,'Show low stock','Tunjuk stok rendah'],['staff','We used 2 kg chicken','Ayam dah guna 2 kilo'],[0,'Confirm','Betul'],['admin','When will chicken run out?','Bila ayam habis?'],[0,'Order 20 kg chicken','Order 20 kilo ayam'],[0,'Confirm','Betul'],[0,'Approve','Lulus'],[0,'Why did costs rise?','Kenapa kos naik?'],[0,'Scan banana','Imbas pisang']];
+  const DEMO=[['owner','Open product stock','Buka stok produk'],[0,'Show low stock','Tunjuk stok rendah'],['staff','We used 2 kg chicken','Ayam dah guna 2 kilo'],[0,'Confirm','Betul'],['owner','When will chicken run out?','Bila ayam habis?'],[0,'Order 20 kg chicken','Order 20 kilo ayam'],[0,'Confirm','Betul'],[0,'Approve','Lulus'],[0,'Why did costs rise?','Kenapa kos naik?'],[0,'Scan banana','Imbas pisang']];
   async function runDemo(){
    if(S.demo){S.demo=false;demoBtn();return}
    S.demo=true;demoBtn();
@@ -495,7 +504,7 @@ export function mountVoiceApp(host, opts = {}) {
   track(document,'pointerdown',e=>{if(e.pointerType!=='touch')return;moveTip(e);clearTimeout(tipT);tipT=setTimeout(()=>tip.classList.remove('on'),2600)}); // no hover on a phone, so a tap shows it
 
   /* movements, history, batches (deterministic sample data) */
-  function addMove(p,type,q){S.moves.unshift({p:p.id,type,q,t:hhmm(new Date()),who:S.role==='admin'?'Syahmi':'Syafiq'})}
+  function addMove(p,type,q){S.moves.unshift({p:p.id,type,q,t:hhmm(new Date()),who:who()})}
   function hist(p){let s=[...p.id].reduce((a,c)=>a+c.charCodeAt(0),7);const out=[];for(let i=0;i<13;i++){s=(s*9301+49297)%233280;out.push(r2(p.avg*(.78+.44*s/233280)))}out.push(S.use[p.id]);return out}
   function batches(p){const a=r2(p.qty*.4),b=r2(p.qty-a),k=p.id.slice(0,2).toUpperCase(),far=p.exp<=3?4:14;
    return [{id:`B-${k}-204`,rec:-3,exp:p.exp,qty:a},{id:`B-${k}-205`,rec:-1,exp:p.exp+far,qty:b}]}
@@ -554,7 +563,7 @@ export function mountVoiceApp(host, opts = {}) {
    S.role=role;S.scene='home';if(opts.onNavigate)opts.onNavigate('home');S.filter='all';S.draft=null;S.user=role;$('#login').hidden=true;
    $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.role===role));
    render(true);startHints();applyChrome();clearLive();
-   if(role==='admin'){
+   if(role!=='staff'){
     later(()=>{if(S.rules.expAlert)notify('warn',L('Milk batch B-MI-204 expires in 3 days','Kelompok susu B-MI-204 luput dalam 3 hari'),L('Use it first, or schedule a promotion.','Guna dahulu, atau jalankan promosi.'))},4500);
     later(()=>{if(S.rules.anomaly)notify('warn',L('Unusual chicken usage','Penggunaan ayam luar biasa'),L('Used 56% above the normal daily rate.','Digunakan 56% melebihi kadar harian biasa.'))},10000);
    }else later(()=>notify('ok',L('New task assigned','Tugas baru diberikan'),L('Check banana freshness before 10 am.','Semak kesegaran pisang sebelum 10 pagi.')),5000);
@@ -567,8 +576,8 @@ export function mountVoiceApp(host, opts = {}) {
   $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.demo=false;setDemoMode(false);S.user=null;demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
   function applyChrome(){
    $('#biz').textContent=L('Dapur Syahmi · Melaka outlet','Dapur Syahmi · Cawangan Melaka');
-   $('#t-user').textContent=S.role==='admin'?'S':'F';$('#t-user').title=S.role==='admin'?'Syahmi · Admin':'Syafiq · '+L('Staff','Staf');
-   $('#t-user').style.background=S.role==='admin'?'var(--accent)':'var(--ok)';
+   $('#t-user').textContent=who()[0];$('#t-user').title=who()+' · '+roleName(S.role);
+   $('#t-user').style.background=S.role==='owner'?'var(--accent)':S.role==='admin'?'#AF52DE':'var(--ok)';
    updateBell();
   }
   const _applyStatic=applyStatic;applyStatic=()=>{_applyStatic();applyChrome()};
@@ -612,7 +621,7 @@ export function mountVoiceApp(host, opts = {}) {
    $('#drawer').innerHTML=`<div class="dr-top"><div><span class="pill ${tone}">${low?L('Low stock','Stok rendah'):p.exp<=3?L('Expiring soon','Hampir luput'):L('Healthy','Baik')}</span><h2>${pn(p)}</h2></div><button class="p-x" data-dclose="1" aria-label="${L('Close','Tutup')}">${ic('x',16)}</button></div>
    <div class="dr-hero"><div class="dr-big"><b>${fq(p.qty)}</b><small>${U(p.unit)} ${L('of','daripada')} ${p.cap}</small></div><span class="lvbar lg ${tone}"><i style="--w:${clamp(p.qty/p.cap*100,3,100).toFixed(1)}%"></i><u style="left:${clamp(p.reorder/p.cap*100,0,100).toFixed(1)}%"></u></span>
     <div class="dr-leg">${m.slice(1).map(r=>`<div><b${r.crit?' style="color:var(--r-crit)"':''}>${r.val}</b>${r.label}</div>`).join('')}</div></div>
-   <div class="facts" style="margin-top:16px"><div><b>${p.sup}</b><span>${L('supplier','pembekal')}</span></div>${S.role==='admin'?`<div><b>${rm(p.qty*p.cost)}</b><span>${L('value','nilai')}</span></div><div><b>${rm(p.cost)}/${U(p.unit)}</b><span>${L('unit cost','kos seunit')}</span></div>`:''}</div>
+   <div class="facts" style="margin-top:16px"><div><b>${p.sup}</b><span>${L('supplier','pembekal')}</span></div>${canFin()?`<div><b>${rm(p.qty*p.cost)}</b><span>${L('value','nilai')}</span></div><div><b>${rm(p.cost)}/${U(p.unit)}</b><span>${L('unit cost','kos seunit')}</span></div>`:''}</div>
    <div class="dr-h">${L('Usage, last 14 days','Penggunaan, 14 hari lalu')}</div>
    <svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('Usage chart','Carta penggunaan')}"><line x1="0" x2="${W}" y1="${ay}" y2="${ay}" stroke="var(--ink-2)" stroke-dasharray="3 5" opacity=".6"/>${bars}</svg>
    <div class="dr-h">${L('Batches','Kelompok')}</div><div class="tblwrap"><table class="tbl"><thead><tr><th>${L('Batch','Kelompok')}</th><th>${L('Received','Diterima')}</th><th>${L('Expires','Luput')}</th><th style="text-align:right">${L('Qty','Kuantiti')}</th></tr></thead><tbody>${bt}</tbody></table></div>
@@ -624,7 +633,7 @@ export function mountVoiceApp(host, opts = {}) {
   const DKG={home:['#5AC8FA','#007AFF'],stock:['#FFB340','#FF7A00'],cost:['#4CD964','#1FAE4B'],fresh:['#5EE0D0','#14A7B8'],ops:['#FF6B5E','#E5243B'],people:['#C98BF5','#8B3FD1'],rules:['#A8A8B0','#6B6B73']};
   function renderPetals(){
    const di=$('#dockitems'),keep=di.scrollLeft;
-   di.innerHTML=NAV[S.role].map(([id,en,ms,icon])=>{const g=DKG[id],b=id==='ops'&&pending().length?`<u>${pending().length}</u>`:'';
+   di.innerHTML=navList().map(([id,en,ms,icon])=>{const g=DKG[id],b=id==='ops'&&pending().length?`<u>${pending().length}</u>`:'';
     return `<button class="dk ${S.scene===id?'on':''}" data-nav="${id}" data-label="${L(en,ms)}" aria-label="${L(en,ms)}" style="background:linear-gradient(160deg,${g[0]},${g[1]})">${ic(icon,26)}${b}</button>`}).join('');
    di.scrollLeft=keep;
    const on=di.querySelector('.on');
@@ -673,7 +682,7 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* sign-in: one lock-screen style form for everyone. The role comes from the account that signs in.
    * Demo accounts (client-side only, sample data): admin / admin  and  staff / admin */
-  const ACCOUNTS=[{role:'admin',user:'admin',pass:'admin'},{role:'staff',user:'staff',pass:'staff'},{role:'admin',user:'demo',pass:'demo',demo:true}];
+  const ACCOUNTS=[{role:'owner',user:'owner',pass:'owner'},{role:'admin',user:'admin',pass:'admin'},{role:'staff',user:'staff',pass:'staff'},{role:'owner',user:'demo',pass:'demo',demo:true}];
   /* Real accounts have one fixed role. Only the demo account (presentation mode) gets the Admin/Staff switch and the 1-minute demo. */
   const setDemoMode=on=>{S.demoMode=!!on;root.classList.toggle('demo-mode',!!on);if(on)requestAnimationFrame(()=>syncSegs())};
   function renderLogin(){
@@ -686,8 +695,8 @@ export function mountVoiceApp(host, opts = {}) {
      <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password" enterkeyhint="go"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
      <p class="lg-err" id="lg-err" role="alert"></p>
      <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
-     <p class="lg-hint"><b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b></p>
-     <p class="lg-hint lg-hint2"><b>demo</b> / <b>demo</b> · ${L('presentation mode, switch between Admin and Staff','mod pembentangan, tukar antara Admin dan Staf')}</p>
+     <p class="lg-hint"><b>owner</b> / <b>owner</b> · <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b></p>
+     <p class="lg-hint lg-hint2"><b>demo</b> / <b>demo</b> · ${L('presentation mode, switch between Owner, Admin and Staff','mod pembentangan, tukar antara Pemilik, Admin dan Staf')}</p>
     </form>
     <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
    if(keep){$('#lg-user').value=keep.u;$('#lg-pass').value=keep.p}
@@ -729,6 +738,7 @@ export function mountVoiceApp(host, opts = {}) {
     get costToday(){return costToday},
     get costAvg(){return costAvg},
     get pending(){return pending},
+    get isOwner(){return isOwner},get isMgr(){return isMgr},get canFin(){return canFin},get who(){return who},get roleName(){return roleName},
     get clamp(){return clamp},
     get seriesN(){return seriesN},
     get pn(){return pn},

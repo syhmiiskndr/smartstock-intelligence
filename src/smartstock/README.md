@@ -14,7 +14,7 @@ src/pages/*.jsx  one tiny page per route, same pattern as the other pages
 
 | Route | Page file | Scene file |
 |---|---|---|
-| `/login` | `Login.jsx` | (login overlay is in the engine): one form, the role comes from the account. Accounts `admin` / `admin` and `staff` / `staff` have a fixed role. `demo` / `demo` is presentation mode: it shows the Admin/Staff switch and the 1-minute demo, which no other account sees |
+| `/login` | `Login.jsx` | (login overlay is in the engine): one form, the role comes from the account. Accounts `owner` / `owner`, `admin` / `admin` and `staff` / `staff` have a fixed role. `demo` / `demo` is presentation mode: it shows the Owner/Admin/Staff switch and the 1-minute demo, which no other account sees |
 | `/` | `Home.jsx` | `scenes/home.js` |
 | `/stock` | `Stock.jsx` | `scenes/stock.js` |
 | `/cost` | `Cost.jsx` | `scenes/cost.js` |
@@ -39,3 +39,13 @@ One codebase, no separate mobile site. The browser picks the layout from the scr
 | Desktop | 1025px and up | Original layout, unchanged |
 
 Touch is detected separately from width: `(hover: none)` turns off hover and 3D tilt effects, `(pointer: coarse)` makes buttons bigger. `#ss-root` gets a `data-device` attribute (`phone`, `tablet` or `desktop`) that follows the screen size, and the keyboard height is exposed as `--kb` so the typing box and login form stay above the phone keyboard.
+
+## Roles: two product layers
+
+| Role | Layer | Home screen | Can open |
+|---|---|---|---|
+| Owner (`owner`) | Intelligence | Action Centre: daily briefing, business health, clickable KPIs, money at risk, alerts with the reason behind each, cost activity, recent activity | everything, including Cost and Rules |
+| Admin (`admin`) | Operational | Operations board: approvals, team tasks, deliveries, stock to act on, staff activity | Stock, Fresh, Approve, People. Cost only if the owner turns on "Admins can see costs and stock value" in Rules |
+| Staff (`staff`) | Operational | Voice tiles and today's tasks | Stock, Fresh |
+
+Permissions live in one place in `engine.js` (`ALLOW`, `isMgr()`, `canFin()`, `allowed()`), used by the dock, voice commands, URL access and the cost/value fields. Actual figures and estimates are labelled differently ("actual" vs "Estimate"). This is client-side only: real enforcement must be Supabase Auth plus a role column and Row Level Security.

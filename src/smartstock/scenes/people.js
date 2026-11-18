@@ -3,7 +3,7 @@ export default function peopleScene(api) {
   const { L, pn, P, sh } = api;
 
   function peopleScene(){
-   const team=[['Syahmi','Admin',1],['Syafiq',L('Staff','Staf'),1],['Siti',L('Staff','Staf'),0],['Hakim',L('Staff','Staf'),1]];
+   const team=[['Syahmi',L('Owner','Pemilik'),1],['Aina','Admin',1],['Syafiq',L('Staff','Staf'),1],['Siti',L('Staff','Staf'),0],['Hakim',L('Staff','Staf'),1]];
    const sups=[['Segar Jaya',['Ayam','Telur','Bawang']],['Mill Sentosa',['Tepung','Beras','Minyak']],['Ladang Hijau',['Susu','Pisang']]];
    const nm=n=>pn(P.find(p=>p.name===n));
    return `${sh(L('People','Orang'),L('3 online now','3 aktif sekarang'))}
