@@ -16,6 +16,7 @@ src/pages/*.jsx  one tiny page per route, same pattern as the other pages
 |---|---|---|
 | `/login` | `Login.jsx` | (login overlay is in the engine): one form, the role comes from the account. Accounts `owner` / `owner`, `admin` / `admin` and `staff` / `staff` have a fixed role. `demo` / `demo` is presentation mode: it shows the Owner/Admin/Staff switch and the 1-minute demo, which no other account sees |
 | `/` | `Home.jsx` | `scenes/home.js` |
+| `/analytics` | `Analytics.jsx` | `scenes/analytics.js` (owner only) |
 | `/stock` | `Stock.jsx` | `scenes/stock.js` |
 | `/cost` | `Cost.jsx` | `scenes/cost.js` |
 | `/fresh` | `Fresh.jsx` | `scenes/fresh.js` |
@@ -44,7 +45,7 @@ Touch is detected separately from width: `(hover: none)` turns off hover and 3D 
 
 | Role | Layer | Home screen | Can open |
 |---|---|---|---|
-| Owner (`owner`) | Intelligence | Action Centre: daily briefing, business health, clickable KPIs, money at risk, alerts with the reason behind each, cost activity, recent activity | everything, including Cost and Rules |
+| Owner (`owner`) | Intelligence | Analytics page (interactive charts) and Action Centre: daily briefing, business health, clickable KPIs, money at risk, alerts with the reason behind each, cost activity, recent activity | everything, including Cost and Rules |
 | Admin (`admin`) | Operational | Operations board: approvals, team tasks, deliveries, stock to act on, staff activity | Stock, Fresh, Approve, People. Cost only if the owner turns on "Admins can see costs and stock value" in Rules |
 | Staff (`staff`) | Operational | Voice tiles and today's tasks | Stock, Fresh |
 

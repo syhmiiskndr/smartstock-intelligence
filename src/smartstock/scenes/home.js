@@ -83,7 +83,7 @@ export default function homeScene(api) {
    const al=alerts(),waste=S.waste.reduce((a,w)=>a+w.amt,0);
    const risk=P.filter(p=>p.exp<=3).reduce((a,p)=>a+p.qty*p.cost,0);
    const ser=seriesN(S.range),mx=Math.max(...ser)*1.12,bw=Math.floor(640/ser.length),W=bw*ser.length;
-   const bars=ser.map((v,i)=>{const h=v/mx*120;return `<rect x="${i*bw+3}" y="${140-h}" width="${bw-6}" height="${h}" rx="5" fill="${i===ser.length-1?'var(--accent)':'var(--accent-soft)'}"/>`}).join('');
+   const bars=ser.map((v,i)=>{const h=v/mx*120;return `<rect x="${i*bw+3}" y="${140-h}" width="${bw-6}" height="${h}" rx="5" fill="${i===ser.length-1?'var(--accent)':'var(--accent-soft)'}" data-tip="${i===ser.length-1?L('Today','Hari ini'):api.dateStr(i-(ser.length-1))}: ${rm0(ser[i])}"/>`}).join('');
    const brief=[
     low.length?L(`${low.length} item${low.length>1?'s':''} will run out before the next delivery.`,`${low.length} item akan habis sebelum penghantaran seterusnya.`):L('Stock levels are healthy.','Paras stok baik.'),
     L(`Cost today is ${rm0(cost)}, ${Math.abs(pct)}% ${pct>=0?'above':'below'} your average.`,`Kos hari ini ${rm0(cost)}, ${Math.abs(pct)}% ${pct>=0?'melebihi':'bawah'} purata.`),
@@ -102,7 +102,7 @@ export default function homeScene(api) {
     ${kpi('cost',L('Cost today','Kos hari ini'),rm0(cost),`${pct>=0?'+':''}${pct}% ${L('vs avg','dari purata')}`,pct>10?'warn':'ok')}
     ${kpi('cost',L('Waste this week','Sisa minggu ini'),rm0(waste),L('actual','sebenar'),waste>30?'warn':'ok')}
     ${kpi('ops',L('Approvals','Kelulusan'),String(pend.length),pend.length?`${rm0(pa)} ${L('waiting','menunggu')}`:L('clear','kosong'),pend.length?'warn':'ok')}
-    <div class="w" style="grid-column:1/-1"><span class="cap">${L('Cost activity','Aktiviti kos')} · <button class="btn" data-go="cost" style="padding:2px 10px">${L('Details','Butiran')}</button></span>
+    <div class="w" style="grid-column:1/-1"><span class="cap">${L('Cost activity','Aktiviti kos')} · <button class="btn" data-go="analytics" style="padding:2px 10px">${L('Explore analytics','Terokai analitik')}</button></span>
      <svg class="chart" viewBox="0 0 ${W} 150" role="img" aria-label="${L('Daily cost','Kos harian')}">${bars}</svg>
      <div class="legend"><span><i style="background:var(--accent)"></i>${L('Today','Hari ini')} · ${L('actual','sebenar')}</span><span><i style="background:var(--accent-soft)"></i>${L('Earlier days','Hari lalu')}</span></div></div>
     <div class="w" style="grid-column:1/-1"><span class="cap">${L('Needs attention','Perlu perhatian')} <span class="pill ${al.length?'warn':'ok'}">${al.length}</span></span>${alertHtml(al)}</div>
