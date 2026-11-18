@@ -12,7 +12,7 @@ export default function stockScene(api) {
     const pct=clamp(p.qty/p.cap*100,3,100),mn=clamp(p.reorder/p.cap*100,0,100),fdot=p.exp<=3?'bad':p.exp<=7?'warn':'ok';
     return `<button class="rg ${dim?'dim':''} ${S.pulse===p.id?'pulse':''}" data-jar="${p.id}" data-tip="${esc(tp)}" aria-label="${pn(p)} ${fq(p.qty)} ${U(p.unit)}"><span class="rg-top"><span class="nm">${pn(p)}</span><span class="qv"><b>${fq(p.qty)}</b><small>${U(p.unit)}</small></span></span><span class="lvbar ${tone}"><i style="--w:${pct.toFixed(1)}%;animation-delay:${i*60}ms"></i><u style="left:${mn.toFixed(1)}%"></u></span><span class="rg-bot"><span class="st ${tone}">${st}</span><span class="fd ${fdot}" title="${L('Freshness','Kesegaran')}"><i></i>${p.exp>=14?L('Fresh','Segar'):p.exp+L('d','h')}</span></span></button>`}).join('');
    S.pulse=null;
-   const meta=S.role==='admin'?`${P.length} ${L('items','item')} · ${rm0(stockValue())}`:`${P.length} ${L('items','item')}`;
+   const meta=api.canFin()?`${P.length} ${L('items','item')} · ${rm0(stockValue())}`:`${P.length} ${L('items','item')}`;
    return `${sh(L('Stock','Stok'),meta)}
    <div class="row" style="align-items:center;justify-content:space-between;margin-top:18px"><div class="seg" role="group" aria-label="${L('Filter','Tapis')}">
     <button data-filter="all" aria-pressed="${f==='all'}">${L('All','Semua')}</button><button data-filter="low" aria-pressed="${f==='low'}">${L('Low','Rendah')} ${ln}</button><button data-filter="exp" aria-pressed="${f==='exp'}">${L('Expiring','Luput')} ${en}</button></div>

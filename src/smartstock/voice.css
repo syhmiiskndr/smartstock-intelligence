@@ -513,3 +513,7 @@
 /* Admin/Staff switch and the 1-minute demo are for the demo login only; real accounts keep a fixed role */
 #ss-root:not(.demo-mode) .tools .seg,#ss-root:not(.demo-mode) #t-demo{display:none}
 #ss-root .lg-hint2{margin-top:-8px;font-size:12px;opacity:.55}
+
+/* Owner Action Centre and admin board: cards that set their own column span stack on small screens */
+@media(max-width:860px){#ss-root .widgets>.w{grid-column:1/-1!important;grid-row:auto!important}}
+@media(min-width:641px) and (max-width:860px){#ss-root .widgets>.w.w-m{grid-column:span 6!important}#ss-root .widgets>.w[style*="span 3"]{grid-column:span 6!important}}

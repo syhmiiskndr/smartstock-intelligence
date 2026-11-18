@@ -7,7 +7,7 @@ export default `<div id="app">
     <div class="rhs"><button class="tbtn bell" id="t-bell"></button><button class="avatar" id="t-user" aria-label="Account">S</button></div>
   </header>
   <div class="tools">
-    <div class="seg" role="group" aria-label="Role"><button data-role="admin" aria-pressed="true">Admin</button><button data-role="staff" aria-pressed="false">Staff</button></div>
+    <div class="seg" role="group" aria-label="Role"><button data-role="owner" aria-pressed="true">Owner</button><button data-role="admin" aria-pressed="false">Admin</button><button data-role="staff" aria-pressed="false">Staff</button></div>
     <button class="tbtn" id="t-demo" aria-pressed="false"></button>
     <button class="tbtn" id="t-log"></button>
     <button class="tbtn" id="t-lang"></button>
