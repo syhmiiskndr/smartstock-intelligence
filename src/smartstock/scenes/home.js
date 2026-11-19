@@ -43,7 +43,7 @@ export default function homeScene(api) {
   const openQty=id=>S.orders.filter(o=>o.item===id&&!o.done).reduce((a,o)=>a+o.qty,0);
 
   function homePulse(){
-   const PL=S.pulse,d=PL.day,own=isOwner(),fin=canFin();
+   const PL=S.pl,d=PL.day,own=isOwner(),fin=canFin();
    const rows=P.map(p=>rowFor(p,d,openQty(p.id),PL.used));
    const score=clamp(Math.round(100-sum(rows.map(r=>r.pen))),0,100);
    const fixO=P.filter(p=>{const r=rowFor(p,0,openQty(p.id),PL.used);return r.needsOrder}).map(p=>p.id),fixU=P.filter(p=>p.exp<=3&&!PL.used[p.id]).map(p=>p.id);
