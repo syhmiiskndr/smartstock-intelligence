@@ -89,6 +89,7 @@ export function mountVoiceApp(host, opts = {}) {
   S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false};
   S.moves=[{p:'ayam',type:'usage',q:3,t:'08:40',who:'Syafiq'},{p:'susu',type:'receive',q:20,t:'07:55',who:'Hakim'},{p:'ayam',type:'receive',q:20,t:'Yesterday',who:'Hakim'},{p:'telur',type:'usage',q:30,t:'09:10',who:'Syafiq'},{p:'ayam',type:'usage',q:4,t:'10:25',who:'Syafiq'}];return S})());
   if(!S.an)S.an={metric:'cost',range:30,cmp:true,fc:true,cat:null};
+  if(!S.oh)S.oh={focus:null};
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
@@ -566,6 +567,8 @@ export function mountVoiceApp(host, opts = {}) {
   track(document,'click',e=>{
    let b;
    if(b=e.target.closest('#stage [data-range]')){S.range=+b.dataset.range;refresh()}
+   if(b=e.target.closest('#stage [data-oh-focus]')){S.oh.focus=b.dataset.ohFocus;refresh()}
+   if(b=e.target.closest('#stage [data-an-go]')){S.an.metric=b.dataset.anGo;go('analytics')}
    if(b=e.target.closest('#stage [data-an-metric]')){S.an.metric=b.dataset.anMetric;refresh()}
    if(b=e.target.closest('#stage [data-an-range]')){S.an.range=+b.dataset.anRange;refresh()}
    if(b=e.target.closest('#stage [data-an-toggle]')){const k=b.dataset.anToggle;S.an[k]=!S.an[k];refresh()}

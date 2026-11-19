@@ -45,7 +45,7 @@ Touch is detected separately from width: `(hover: none)` turns off hover and 3D 
 
 | Role | Layer | Home screen | Can open |
 |---|---|---|---|
-| Owner (`owner`) | Intelligence | Analytics page (interactive charts) and Action Centre: daily briefing, business health, clickable KPIs, money at risk, alerts with the reason behind each, cost activity, recent activity | everything, including Cost and Rules |
+| Owner (`owner`) | Intelligence | Analytics page (interactive charts) and Action Centre home: tappable health rings that show what pulls the score down and how to fix it, decision queue with Approve/Reject, KPI cards that open Analytics, cost chart with hover/touch readout, stock runway, team pulse, today's timeline, Ask SmartStock shortcuts | everything, including Cost and Rules |
 | Admin (`admin`) | Operational | Operations board: approvals, team tasks, deliveries, stock to act on, staff activity | Stock, Fresh, Approve, People. Cost only if the owner turns on "Admins can see costs and stock value" in Rules |
 | Staff (`staff`) | Operational | Voice tiles and today's tasks | Stock, Fresh |
 
