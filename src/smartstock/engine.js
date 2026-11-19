@@ -89,7 +89,7 @@ export function mountVoiceApp(host, opts = {}) {
   S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false};
   S.moves=[{p:'ayam',type:'usage',q:3,t:'08:40',who:'Syafiq'},{p:'susu',type:'receive',q:20,t:'07:55',who:'Hakim'},{p:'ayam',type:'receive',q:20,t:'Yesterday',who:'Hakim'},{p:'telur',type:'usage',q:30,t:'09:10',who:'Syafiq'},{p:'ayam',type:'usage',q:4,t:'10:25',who:'Syafiq'}];return S})());
   if(!S.an)S.an={metric:'cost',range:30,cmp:true,fc:true,cat:null};
-  if(!S.oh)S.oh={focus:null};
+  if(!S.pulse)S.pulse={sel:'ayam',day:0,used:{},filter:null,playing:false,shown:0,toast:''};
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
@@ -147,7 +147,52 @@ export function mountVoiceApp(host, opts = {}) {
    stage.innerHTML=(SCENES[S.scene]||missingScene)();
    if(bloom){stage.classList.remove('bloom');void stage.offsetWidth;stage.classList.add('bloom');stage.scrollTop=0}
    if(S.scene==='ops')bindOps();
+   if(S.scene==='home'&&S.role!=='staff'){if(bloom)S.pulse.shown=0;plCount()}
    renderPetals();
+  }
+
+  /* ---- Business Pulse (home for owner and admin): patch the page in place so tiles, gauge and bars animate ---- */
+  let plRaf=0,plTm=0,plTt=0;
+  function morph(a,b){
+   if(a.nodeType!==b.nodeType||a.nodeName!==b.nodeName){a.replaceWith(b.cloneNode(true));return}
+   if(a.nodeType===3){if(a.nodeValue!==b.nodeValue)a.nodeValue=b.nodeValue;return}
+   if(a.nodeType!==1)return;
+   [...a.attributes].forEach(t=>{if(!b.hasAttribute(t.name))a.removeAttribute(t.name)});
+   [...b.attributes].forEach(t=>{if(a.getAttribute(t.name)!==t.value)a.setAttribute(t.name,t.value)});
+   if(a.id==='pl-day'){a.value=b.getAttribute('value');return}
+   const ac=[...a.childNodes],bc=[...b.childNodes];
+   bc.forEach((n,i)=>ac[i]?morph(ac[i],n):a.appendChild(n.cloneNode(true)));
+   ac.slice(bc.length).forEach(n=>n.remove());
+  }
+  function plPatch(){
+   const root=stage.querySelector('.pl');if(!root||!SCENES[S.scene])return;
+   const t=document.createElement('div');t.innerHTML=SCENES[S.scene]();const nr=t.querySelector('.pl');
+   if(nr){morph(root,nr);plCount()}
+  }
+  function plCount(){
+   const el=stage.querySelector('.pl-score');if(!el)return;
+   const to=+el.dataset.to,from=S.pulse.shown;if(from===to){el.textContent=to;return}
+   cancelAnimationFrame(plRaf);const t0=performance.now();
+   const step=now=>{const k=Math.min(1,(now-t0)/800),v=Math.round(from+(to-from)*(1-Math.pow(1-k,3))),e=stage.querySelector('.pl-score');S.pulse.shown=v;if(e)e.textContent=v;if(k<1)plRaf=requestAnimationFrame(step)};
+   plRaf=requestAnimationFrame(step);
+  }
+  function plToast(msg){S.pulse.toast=msg;clearTimeout(plTt);plTt=setTimeout(()=>{S.pulse.toast='';plPatch()},2600)}
+  function pulseOrder(id){const p=prod(id);if(!p||S.orders.some(o=>o.item===id&&!o.done))return false;newPO({item:id,qty:suggest(p)});log(orderSay(p),L('Order','Order'),L('Done','Dilaksana'));return true}
+  function pulseUse(id){const p=prod(id);if(!p||S.pulse.used[id])return false;S.pulse.used[id]=true;S.tasks.unshift({id:'use-'+id,en:`Use ${p.en||p.name} first`,ms:`Guna ${p.name} dahulu`,done:false,key:'use:'+id});log(`Use ${p.en||p.name} first`,L('Use first','Guna dahulu'),L('Done','Dilaksana'));return true}
+  function plAct(k,id,el){
+   const PL=S.pulse;
+   if(k==='sel')PL.sel=id;
+   else if(k==='filter')PL.filter=PL.filter===id?null:id;
+   else if(k==='order'){if(pulseOrder(id))plToast(L(`${pn(prod(id))} ordered`,`${pn(prod(id))} diorder`))}
+   else if(k==='use'){if(pulseUse(id))plToast(L(`${pn(prod(id))} marked to use first`,`${pn(prod(id))} ditanda guna dahulu`))}
+   else if(k==='fix'){const o=(el.dataset.order||'').split(',').filter(Boolean),u=(el.dataset.use||'').split(',').filter(Boolean);o.forEach(pulseOrder);u.forEach(pulseUse);if(o.length+u.length)plToast(L('Everything handled','Semua telah diurus'))}
+   else if(k==='play'){
+    clearInterval(plTm);
+    if(PL.playing){PL.playing=false}
+    else{PL.playing=true;if(PL.day>=7)PL.day=0;plTm=setInterval(()=>{const nd=Math.round((S.pulse.day+.1)*10)/10;if(nd>7||!stage.querySelector('.pl')){clearInterval(plTm);S.pulse.playing=false}else S.pulse.day=nd;plPatch()},110)}
+   }
+   else if(k==='reset'){clearInterval(plTm);Object.assign(PL,{day:0,used:{},filter:null,playing:false,sel:'ayam',toast:''})}
+   plPatch();
   }
   function go(scene){
    if(!allowed(scene))return deny();
@@ -514,6 +559,7 @@ export function mountVoiceApp(host, opts = {}) {
    const f=v=>m==='usage'?Math.round(v)+' '+L('units','unit'):rm0(v),fc=i>=n,avg=vals.slice(0,n).reduce((a,b)=>a+b,0)/n,dv=Math.round((vals[i]/avg-1)*100);
    $('#an-read').innerHTML=`<b>${f(vals[i])}</b><span>${labs[i]}${fc?' · '+L('forecast, an estimate','ramalan, anggaran'):''}</span><span class="pill ${dv>10?'warn':''}">${dv>=0?'+':''}${dv}% ${L('vs average','dari purata')}</span>${prev&&i<n?`<span class="pill">${L('previous','sebelum')} ${f(prev[i])}</span>`:''}`;
   };
+  track(document,'input',e=>{const r=e.target.closest&&e.target.closest('#pl-day');if(r){clearInterval(plTm);S.pulse.playing=false;S.pulse.day=+r.value;plPatch()}});
   track(document,'pointermove',anScrub);track(document,'pointerdown',anScrub);
   track(document,'pointerdown',e=>{if(e.pointerType!=='touch')return;moveTip(e);clearTimeout(tipT);tipT=setTimeout(()=>tip.classList.remove('on'),2600)}); // no hover on a phone, so a tap shows it
 
@@ -567,7 +613,7 @@ export function mountVoiceApp(host, opts = {}) {
   track(document,'click',e=>{
    let b;
    if(b=e.target.closest('#stage [data-range]')){S.range=+b.dataset.range;refresh()}
-   if(b=e.target.closest('#stage [data-oh-focus]')){S.oh.focus=b.dataset.ohFocus;refresh()}
+   if(b=e.target.closest('#stage [data-pl]')){plAct(b.dataset.pl,b.dataset.id,b)}
    if(b=e.target.closest('#stage [data-an-go]')){S.an.metric=b.dataset.anGo;go('analytics')}
    if(b=e.target.closest('#stage [data-an-metric]')){S.an.metric=b.dataset.anMetric;refresh()}
    if(b=e.target.closest('#stage [data-an-range]')){S.an.range=+b.dataset.anRange;refresh()}

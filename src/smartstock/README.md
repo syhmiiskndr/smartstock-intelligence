@@ -45,8 +45,12 @@ Touch is detected separately from width: `(hover: none)` turns off hover and 3D 
 
 | Role | Layer | Home screen | Can open |
 |---|---|---|---|
-| Owner (`owner`) | Intelligence | Analytics page (interactive charts) and Action Centre home: tappable health rings that show what pulls the score down and how to fix it, decision queue with Approve/Reject, KPI cards that open Analytics, cost chart with hover/touch readout, stock runway, team pulse, today's timeline, Ask SmartStock shortcuts | everything, including Cost and Rules |
-| Admin (`admin`) | Operational | Operations board: approvals, team tasks, deliveries, stock to act on, staff activity | Stock, Fresh, Approve, People. Cost only if the owner turns on "Admins can see costs and stock value" in Rules |
+| Owner (`owner`) | Intelligence | Analytics page (interactive charts) and the Business Pulse home | everything, including Cost and Rules |
+| Admin (`admin`) | Operational | The same Business Pulse home, with operations KPIs (tasks, deliveries, approvals, items to reorder) and no prices unless the owner allows it | Stock, Fresh, Approve, People. Cost only if the owner turns on "Admins can see costs and stock value" in Rules |
 | Staff (`staff`) | Operational | Voice tiles and today's tasks | Stock, Fresh |
 
 Permissions live in one place in `engine.js` (`ALLOW`, `isMgr()`, `canFin()`, `allowed()`), used by the dock, voice commands, URL access and the cost/value fields. Actual figures and estimates are labelled differently ("actual" vs "Estimate"). This is client-side only: real enforcement must be Supabase Auth plus a role column and Row Level Security.
+
+## Business Pulse (owner and admin home)
+
+`scenes/home.js` (`homePulse`) draws it, `engine.js` (search "Business Pulse") handles the clicks. A live stock-room map (each tile fills with the stock left), a health score with a hatched "if you act" gain, one story per item, a runway bar with the supplier delivery time, and a time slider (or Play) that shows the next 7 days. Order and Use first are real: Order creates a purchase order in Order tracking, Use first adds a task for the team. The page is patched in place (a small DOM morph) so tiles, gauge and bars animate instead of redrawing. Supplier lead times are in `LEAD` (backend: `suppliers.lead_time_days`).
