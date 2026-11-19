@@ -89,7 +89,7 @@ export function mountVoiceApp(host, opts = {}) {
   S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false};
   S.moves=[{p:'ayam',type:'usage',q:3,t:'08:40',who:'Syafiq'},{p:'susu',type:'receive',q:20,t:'07:55',who:'Hakim'},{p:'ayam',type:'receive',q:20,t:'Yesterday',who:'Hakim'},{p:'telur',type:'usage',q:30,t:'09:10',who:'Syafiq'},{p:'ayam',type:'usage',q:4,t:'10:25',who:'Syafiq'}];return S})());
   if(!S.an)S.an={metric:'cost',range:30,cmp:true,fc:true,cat:null};
-  if(!S.pulse)S.pulse={sel:'ayam',day:0,used:{},filter:null,playing:false,shown:0,toast:''};
+  if(!S.pl)S.pl={sel:'ayam',day:0,used:{},filter:null,playing:false,shown:0,toast:''};
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
@@ -147,7 +147,7 @@ export function mountVoiceApp(host, opts = {}) {
    stage.innerHTML=(SCENES[S.scene]||missingScene)();
    if(bloom){stage.classList.remove('bloom');void stage.offsetWidth;stage.classList.add('bloom');stage.scrollTop=0}
    if(S.scene==='ops')bindOps();
-   if(S.scene==='home'&&S.role!=='staff'){if(bloom)S.pulse.shown=0;plCount()}
+   if(S.scene==='home'&&S.role!=='staff'){if(bloom)S.pl.shown=0;plCount()}
    renderPetals();
   }
 
@@ -171,16 +171,16 @@ export function mountVoiceApp(host, opts = {}) {
   }
   function plCount(){
    const el=stage.querySelector('.pl-score');if(!el)return;
-   const to=+el.dataset.to,from=S.pulse.shown;if(from===to){el.textContent=to;return}
+   const to=+el.dataset.to,from=S.pl.shown;if(from===to){el.textContent=to;return}
    cancelAnimationFrame(plRaf);const t0=performance.now();
-   const step=now=>{const k=Math.min(1,(now-t0)/800),v=Math.round(from+(to-from)*(1-Math.pow(1-k,3))),e=stage.querySelector('.pl-score');S.pulse.shown=v;if(e)e.textContent=v;if(k<1)plRaf=requestAnimationFrame(step)};
+   const step=now=>{const k=Math.min(1,(now-t0)/800),v=Math.round(from+(to-from)*(1-Math.pow(1-k,3))),e=stage.querySelector('.pl-score');S.pl.shown=v;if(e)e.textContent=v;if(k<1)plRaf=requestAnimationFrame(step)};
    plRaf=requestAnimationFrame(step);
   }
-  function plToast(msg){S.pulse.toast=msg;clearTimeout(plTt);plTt=setTimeout(()=>{S.pulse.toast='';plPatch()},2600)}
+  function plToast(msg){S.pl.toast=msg;clearTimeout(plTt);plTt=setTimeout(()=>{S.pl.toast='';plPatch()},2600)}
   function pulseOrder(id){const p=prod(id);if(!p||S.orders.some(o=>o.item===id&&!o.done))return false;newPO({item:id,qty:suggest(p)});log(orderSay(p),L('Order','Order'),L('Done','Dilaksana'));return true}
-  function pulseUse(id){const p=prod(id);if(!p||S.pulse.used[id])return false;S.pulse.used[id]=true;S.tasks.unshift({id:'use-'+id,en:`Use ${p.en||p.name} first`,ms:`Guna ${p.name} dahulu`,done:false,key:'use:'+id});log(`Use ${p.en||p.name} first`,L('Use first','Guna dahulu'),L('Done','Dilaksana'));return true}
+  function pulseUse(id){const p=prod(id);if(!p||S.pl.used[id])return false;S.pl.used[id]=true;S.tasks.unshift({id:'use-'+id,en:`Use ${p.en||p.name} first`,ms:`Guna ${p.name} dahulu`,done:false,key:'use:'+id});log(`Use ${p.en||p.name} first`,L('Use first','Guna dahulu'),L('Done','Dilaksana'));return true}
   function plAct(k,id,el){
-   const PL=S.pulse;
+   const PL=S.pl;
    if(k==='sel')PL.sel=id;
    else if(k==='filter')PL.filter=PL.filter===id?null:id;
    else if(k==='order'){if(pulseOrder(id))plToast(L(`${pn(prod(id))} ordered`,`${pn(prod(id))} diorder`))}
@@ -189,7 +189,7 @@ export function mountVoiceApp(host, opts = {}) {
    else if(k==='play'){
     clearInterval(plTm);
     if(PL.playing){PL.playing=false}
-    else{PL.playing=true;if(PL.day>=7)PL.day=0;plTm=setInterval(()=>{const nd=Math.round((S.pulse.day+.1)*10)/10;if(nd>7||!stage.querySelector('.pl')){clearInterval(plTm);S.pulse.playing=false}else S.pulse.day=nd;plPatch()},110)}
+    else{PL.playing=true;if(PL.day>=7)PL.day=0;plTm=setInterval(()=>{const nd=Math.round((S.pl.day+.1)*10)/10;if(nd>7||!stage.querySelector('.pl')){clearInterval(plTm);S.pl.playing=false}else S.pl.day=nd;plPatch()},110)}
    }
    else if(k==='reset'){clearInterval(plTm);Object.assign(PL,{day:0,used:{},filter:null,playing:false,sel:'ayam',toast:''})}
    plPatch();
@@ -559,7 +559,7 @@ export function mountVoiceApp(host, opts = {}) {
    const f=v=>m==='usage'?Math.round(v)+' '+L('units','unit'):rm0(v),fc=i>=n,avg=vals.slice(0,n).reduce((a,b)=>a+b,0)/n,dv=Math.round((vals[i]/avg-1)*100);
    $('#an-read').innerHTML=`<b>${f(vals[i])}</b><span>${labs[i]}${fc?' · '+L('forecast, an estimate','ramalan, anggaran'):''}</span><span class="pill ${dv>10?'warn':''}">${dv>=0?'+':''}${dv}% ${L('vs average','dari purata')}</span>${prev&&i<n?`<span class="pill">${L('previous','sebelum')} ${f(prev[i])}</span>`:''}`;
   };
-  track(document,'input',e=>{const r=e.target.closest&&e.target.closest('#pl-day');if(r){clearInterval(plTm);S.pulse.playing=false;S.pulse.day=+r.value;plPatch()}});
+  track(document,'input',e=>{const r=e.target.closest&&e.target.closest('#pl-day');if(r){clearInterval(plTm);S.pl.playing=false;S.pl.day=+r.value;plPatch()}});
   track(document,'pointermove',anScrub);track(document,'pointerdown',anScrub);
   track(document,'pointerdown',e=>{if(e.pointerType!=='touch')return;moveTip(e);clearTimeout(tipT);tipT=setTimeout(()=>tip.classList.remove('on'),2600)}); // no hover on a phone, so a tap shows it
 
