@@ -75,38 +75,69 @@ export default function homeScene(api) {
   const alertHtml=list=>list.length?`<div class="nl">${list.map(a=>`<div><i class="${a.tone}"></i><span><b>${a.t}</b>${a.why}${a.act?`<br><button class="btn" style="margin-top:8px" data-say="${esc(a.act.say)}">${a.act.l}</button>`:''}</span></div>`).join('')}</div>`
    :`<p class="say" style="margin:0">${L('Nothing needs attention.','Tiada yang perlu perhatian.')}</p>`;
 
+  const spark=(arr,tone)=>{const mx=Math.max(...arr),mn=Math.min(...arr),pts=arr.map((v,i)=>`${(i/(arr.length-1)*100).toFixed(1)},${(26-(v-mn)/(mx-mn||1)*22).toFixed(1)}`).join(' ');
+   return `<svg viewBox="0 0 100 30" preserveAspectRatio="none" class="an-spark"><polyline points="${pts}" fill="none" stroke="${tone||'var(--accent)'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`};
+  const wob=(seed,n,base)=>{let x=seed;return Array.from({length:n},(_,i)=>{x=(x*9301+49297)%233280;return base*(.96+.06*x/233280+(i/n)*.01)})};
+
   function homeOwner(){
-   const low=P.filter(p=>p.qty<=p.reorder),pend=pending(),pa=pend.reduce((a,r)=>a+r.amount,0);
-   const cost=costToday(),pct=Math.round((cost/costAvg()-1)*100);
-   const health=clamp(100-10*low.length-3*P.filter(p=>p.exp<=3).length-(pct>10?4:0)-pend.length,0,100);
+   const low=P.filter(p=>p.qty<=p.reorder),exps=P.filter(p=>p.exp<=3),pend=pending(),pa=pend.reduce((a,r)=>a+r.amount,0);
+   const cost=costToday(),pct=Math.round((cost/costAvg()-1)*100),waste=S.waste.reduce((a,w)=>a+w.amt,0);
+   const lostStock=10*low.length,lostFresh=3*exps.length,lostCost=pct>10?4:0,lostOps=pend.length;
+   const health=clamp(100-lostStock-lostFresh-lostCost-lostOps,0,100);
    const sH=Math.round((P.length-low.length)/P.length*100),fH=Math.round(P.filter(p=>p.exp>3).length/P.length*100),cH=clamp(100-Math.max(0,pct),0,100);
-   const al=alerts(),waste=S.waste.reduce((a,w)=>a+w.amt,0);
-   const risk=P.filter(p=>p.exp<=3).reduce((a,p)=>a+p.qty*p.cost,0);
-   const ser=seriesN(S.range),mx=Math.max(...ser)*1.12,bw=Math.floor(640/ser.length),W=bw*ser.length;
-   const bars=ser.map((v,i)=>{const h=v/mx*120;return `<rect x="${i*bw+3}" y="${140-h}" width="${bw-6}" height="${h}" rx="5" fill="${i===ser.length-1?'var(--accent)':'var(--accent-soft)'}" data-tip="${i===ser.length-1?L('Today','Hari ini'):api.dateStr(i-(ser.length-1))}: ${rm0(ser[i])}"/>`}).join('');
-   const brief=[
-    low.length?L(`${low.length} item${low.length>1?'s':''} will run out before the next delivery.`,`${low.length} item akan habis sebelum penghantaran seterusnya.`):L('Stock levels are healthy.','Paras stok baik.'),
-    L(`Cost today is ${rm0(cost)}, ${Math.abs(pct)}% ${pct>=0?'above':'below'} your average.`,`Kos hari ini ${rm0(cost)}, ${Math.abs(pct)}% ${pct>=0?'melebihi':'bawah'} purata.`),
-    pend.length?L(`${pend.length} approval${pend.length>1?'s':''} (${rm0(pa)}) waiting for you.`,`${pend.length} kelulusan (${rm0(pa)}) menunggu anda.`):L('No approvals waiting.','Tiada kelulusan menunggu.')];
-   const kpi=(go,cap,val,sub,tone)=>`<button class="w w-m" data-go="${go}" style="grid-column:span 3;text-align:left;align-items:flex-start"><span class="cap">${cap}</span><span class="num">${val}</span><span class="pill ${tone||''}">${sub}</span></button>`;
-   return `<div class="hello"><h1 class="h1">${greet()}, ${who()}</h1><span class="say">${L('Action Centre · what needs you today','Pusat Tindakan · apa yang perlukan anda hari ini')}</span></div>
-   <div class="widgets">
-    <div class="w w-health"><span class="cap">${L('Business health','Kesihatan bisnes')}</span><div class="health-body"><div class="hr">${ringSet([{k:'stock',v:clamp(health,3,100),crit:health<50}],160,18)}<div class="ctr"><b>${health}<span>%</span></b></div></div>
-     <div class="hl"><div class="c1"><b>${sH}%</b>${L('Stock above minimum','Stok melebihi minimum')}</div><div class="c2"><b>${fH}%</b>${L('Items fresh','Item segar')}</div><div class="c3"><b>${cH}%</b>${L('Cost control','Kawalan kos')}</div></div></div>
-     <button class="tbtn" data-speak="1">${ic('spk',16)}<span>${L('Hear briefing','Dengar ringkasan')}</span></button></div>
-    <div class="w w-s"><span class="cap">${ic('mic',14)} ${L('Daily briefing','Ringkasan harian')}</span>
-     <div class="nl">${brief.map(t=>`<div><i class="${/run out|habis/.test(t)?'bad':''}"></i><span><b style="font-weight:500">${t}</b></span></div>`).join('')}</div></div>
-    <div class="w w-m" style="grid-column:span 7"><span class="cap">${L('Money at risk','Wang berisiko')}</span><span class="num">${rm0(risk)}</span>
-     <span class="say" style="margin:0">${L('Estimate: stock that expires within 3 days if not used or promoted. Not a confirmed loss.','Anggaran: stok yang luput dalam 3 hari jika tidak digunakan atau dipromosi. Bukan kerugian sebenar.')}</span></div>
-    ${kpi('stock',L('Stock value','Nilai stok'),rm0(api.stockValue()),L('actual','sebenar'))}
-    ${kpi('cost',L('Cost today','Kos hari ini'),rm0(cost),`${pct>=0?'+':''}${pct}% ${L('vs avg','dari purata')}`,pct>10?'warn':'ok')}
-    ${kpi('cost',L('Waste this week','Sisa minggu ini'),rm0(waste),L('actual','sebenar'),waste>30?'warn':'ok')}
-    ${kpi('ops',L('Approvals','Kelulusan'),String(pend.length),pend.length?`${rm0(pa)} ${L('waiting','menunggu')}`:L('clear','kosong'),pend.length?'warn':'ok')}
-    <div class="w" style="grid-column:1/-1"><span class="cap">${L('Cost activity','Aktiviti kos')} · <button class="btn" data-go="analytics" style="padding:2px 10px">${L('Explore analytics','Terokai analitik')}</button></span>
-     <svg class="chart" viewBox="0 0 ${W} 150" role="img" aria-label="${L('Daily cost','Kos harian')}">${bars}</svg>
-     <div class="legend"><span><i style="background:var(--accent)"></i>${L('Today','Hari ini')} · ${L('actual','sebenar')}</span><span><i style="background:var(--accent-soft)"></i>${L('Earlier days','Hari lalu')}</span></div></div>
-    <div class="w" style="grid-column:1/-1"><span class="cap">${L('Needs attention','Perlu perhatian')} <span class="pill ${al.length?'warn':'ok'}">${al.length}</span></span>${alertHtml(al)}</div>
-    <div class="w" style="grid-column:1/-1"><span class="cap">${L('Recent activity','Aktiviti terkini')}</span><div class="mv">${recent(5)}</div></div>
+   const comps=[{k:'stock',n:L('Stock','Stok'),v:sH,lost:lostStock},{k:'fresh',n:L('Freshness','Kesegaran'),v:fH,lost:lostFresh},{k:'cover',n:L('Cost control','Kawalan kos'),v:cH,lost:lostCost}];
+   const worst=comps.slice().sort((a,b)=>b.lost-a.lost)[0].k,foc=S.oh.focus&&comps.some(c=>c.k===S.oh.focus)?S.oh.focus:worst;
+   const detail={
+    stock:low.map(p=>({t:L(`${pn(p)} is below minimum (${fq(p.qty)} ${U(p.unit)})`,`${pn(p)} bawah minimum (${fq(p.qty)} ${U(p.unit)})`),pts:10,b:L(`Order ${suggest(p)} ${U(p.unit)}`,`Order ${suggest(p)} ${U(p.unit)}`),say:orderSay(p)})),
+    fresh:exps.map(p=>({t:L(`${pn(p)} expires in ${p.exp} days`,`${pn(p)} luput ${p.exp} hari`),pts:3,b:L('Scan','Imbas'),say:`${L('Scan','Imbas')} ${pn(p).toLowerCase()}`})),
+    cover:pct>10?[{t:L(`Cost is ${pct}% above your average`,`Kos ${pct}% melebihi purata`),pts:4,b:L('Why?','Kenapa?'),say:L('Why did costs rise?','Kenapa kos naik?')}]:[]
+   }[foc];
+   const gain=sum=>sum.reduce((a,x)=>a+x.pts,0);
+   const al=alerts(),ser=seriesN(S.range),n=ser.length,mxs=Math.max(...ser)*1.15,W=720,H=230,pl=44,pr=12,pt=12,pb=28,cw=W-pl-pr,ph=H-pt-pb;
+   const X=i=>pl+i*cw/(n-1),Y=v=>pt+(1-v/mxs)*ph;
+   const curve=ser.map((v,i)=>{const x=X(i),y=Y(v);if(!i)return `M${x.toFixed(1)} ${y.toFixed(1)}`;const px=X(i-1),py=Y(ser[i-1]),c=(x-px)/2;return `C${(px+c).toFixed(1)} ${py.toFixed(1)} ${(x-c).toFixed(1)} ${y.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`}).join('');
+   const avg=ser.slice(0,-1).reduce((a,b)=>a+b,0)/(n-1),lab=i=>i===n-1?L('Today','Hari ini'):api.dateStr(i-(n-1));
+   const grid=[0,.5,1].map(t=>{const v=mxs*t;return `<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${pl-8}" y="${Y(v)+4}" text-anchor="end">${Math.round(v)}</text>`}).join('');
+   const xt=n<=7?ser.map((_,i)=>i):[0,Math.round(n/3),Math.round(2*n/3),n-1];
+   const chart=`<svg class="chart an-main" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('Daily cost','Kos harian')}" data-w="${W}" data-pl="${pl}" data-cw="${cw}" data-pt="${pt}" data-ph="${ph}" data-max="${mxs}" data-n="${n}" data-m="cost" data-vals="${ser.map(v=>v.toFixed(2)).join(',')}" data-prev="" data-labs="${ser.map((_,i)=>lab(i)).join('|')}">
+    <defs><linearGradient id="ohg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>${grid}
+    <line x1="${pl}" x2="${W-pr}" y1="${Y(avg)}" y2="${Y(avg)}" stroke="var(--ink-2)" stroke-dasharray="3 5" opacity=".55"/>
+    <path d="${curve}L${X(n-1)} ${Y(0)}L${X(0)} ${Y(0)}Z" fill="url(#ohg)"/><path class="an-line" d="${curve}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" pathLength="1"/>
+    <circle cx="${X(n-1)}" cy="${Y(ser[n-1])}" r="6" fill="var(--accent)" stroke="var(--surface)" stroke-width="3"/>
+    ${xt.map(i=>`<text x="${X(i)}" y="${H-8}" text-anchor="${i===n-1?'end':i===0?'start':'middle'}">${n<=7?(i===n-1?L('Today','Hari ini'):api.dateStr(i-(n-1)).split(' ')[0]):lab(i)}</text>`).join('')}
+    <line class="an-cx" x1="0" x2="0" y1="${pt}" y2="${pt+ph}" stroke="var(--ink)" stroke-width="1" opacity="0"/><circle class="an-cd" r="6" fill="var(--accent)" stroke="var(--surface)" stroke-width="3" opacity="0"/><rect class="an-hit" x="${pl}" y="${pt}" width="${cw}" height="${ph}" fill="transparent"/></svg>`;
+   const kpi=(k,cap,val,sp,sub,tone)=>`<button class="w oh-kpi s3" data-an-go="${k}"><span class="cap">${cap}</span><span class="num">${val}</span>${sp}<span class="pill ${tone||''}">${sub}</span></button>`;
+   const sv=api.stockValue(),head=pend.length+low.length?L(`${pend.length+low.length+(exps.length?1:0)} things need you today`,`${pend.length+low.length+(exps.length?1:0)} perkara perlukan anda hari ini`):L('Everything is on track today','Semuanya lancar hari ini');
+   const dstr=new Date().toLocaleDateString(S.lang==='ms'?'ms-MY':'en-GB',{weekday:'long',day:'numeric',month:'long'});
+   const sev=['bad','warn','ok'];
+   const dq=[...pend.map(r=>{const p=byId(r.item);return `<div class="oh-dq"><i class="warn"></i><span><b>${r.kind==='order'?L('Approve order','Lulus order'):L('Approve write-off','Lulus tulis-off')} · ${fq(r.qty)} ${U(p.unit)} ${pn(p).toLowerCase()}</b>${L('Requested by','Diminta oleh')} ${r.by} · ${rm0(r.amount)}</span><div class="row" style="margin:0"><button class="btn primary" data-say="${L('Approve','Lulus')}">${L('Approve','Lulus')}</button><button class="btn" data-say="${L('Reject','Tolak')}">${L('Reject','Tolak')}</button></div></div>`}),
+    ...al.slice(0,3).map(a=>`<div class="oh-dq"><i class="${a.tone}"></i><span><b>${a.t}</b>${a.why}</span>${a.act?`<button class="btn" data-say="${esc(a.act.say)}">${a.act.l}</button>`:''}</div>`)].join('')||`<p class="say" style="margin:0">${L('Nothing needs a decision.','Tiada keputusan diperlukan.')}</p>`;
+   const rows=P.map(p=>({p,d:p.qty/p.avg,lead:LEAD[p.sup]||2})).sort((a,b)=>a.d-b.d).slice(0,6);
+   const run=rows.map(r=>{const w=clamp(r.d/10*100,2,100),lp=clamp(r.lead/10*100,0,100),t=r.d<r.lead?'bad':r.d<r.lead+2?'warn':'ok';return `<div class="an-rrow" data-tip="${esc(pn(r.p))}: ${r.d.toFixed(1)} ${L('days left','hari lagi')} · ${r.p.sup} ${r.lead} ${L('day delivery','hari hantar')}"><span>${pn(r.p)}</span><i class="an-rbar"><u class="${t}" style="width:${w}%"></u><s style="left:${lp}%"></s></i><b class="${t}">${r.d.toFixed(1)}${L('d','h')}</b></div>`}).join('');
+   const team=[['Aina','Admin',1],['Syafiq',L('Staff','Staf'),1],['Siti',L('Staff','Staf'),0],['Hakim',L('Staff','Staf'),1]].map(([nm,rl,on])=>{const m=S.moves.find(x=>x.who===nm),p=m&&byId(m.p);
+    return `<div class="oh-tm"><i class="oh-av ${on?'on':''}">${nm[0]}</i><span><b>${nm}</b><small>${rl} · ${on?L('online','dalam talian'):L('off shift','tiada syif')}</small></span><em>${m&&p?`${mvVerb(m.type)} ${fq(m.q)} ${U(p.unit)} ${pn(p).toLowerCase()} · ${m.t}`:L('no activity yet','belum ada aktiviti')}</em></div>`}).join('');
+   const tl=[...S.tasks.map((t,i)=>({h:['10:00','11:30','14:00'][i]||'16:00',t:L(t.en,t.ms),done:t.done,k:'tk'})),...S.orders.filter(o=>!o.done).map(o=>({h:o.step===3?L('Now','Sekarang'):'08:00',t:`PO #${o.no} · ${o.sup} ${o.step===3?L('delivered','tiba'):L('arriving','tiba esok')}`,done:false,k:'po'})),...exps.slice(0,2).map(p=>({h:L('Today','Hari ini'),t:L(`${pn(p)} expires in ${p.exp} days`,`${pn(p)} luput ${p.exp} hari`),done:false,k:'exp'}))];
+   const tlh=tl.map(x=>`<div class="oh-tl ${x.done?'done':''}"><time>${x.h}</time><u class="tdot ${x.k}"></u><span>${x.t}</span></div>`).join('');
+   const rg=ringSet(comps.map(c=>({k:c.k,v:clamp(c.v,3,100),crit:c.v<50})),210,16);
+   return `<div class="oh-grid">
+    <div class="w oh-hero s12"><div><span class="cap">${dstr}</span><h1 class="h1" style="font-size:clamp(28px,5vw,44px)">${greet()}, ${who()}</h1><p class="oh-head">${head}</p></div>
+     <div class="row" style="margin:0"><button class="btn primary" data-speak="1">${ic('spk',15)} ${L('Hear briefing','Dengar ringkasan')}</button><button class="btn" data-go="ops">${L('Approvals','Kelulusan')} ${pend.length?`<span class="pill warn" style="margin-left:6px">${pend.length}</span>`:''}</button><button class="btn" data-go="analytics">${ic('trend',15)} ${L('Analytics','Analitik')}</button></div></div>
+    <div class="w oh-health s5"><span class="cap">${L('Business health','Kesihatan bisnes')} <span class="pill ${health>=80?'ok':health>=60?'warn':'bad'}">${health>=80?L('Good','Baik'):health>=60?L('Fair','Sederhana'):L('At risk','Berisiko')}</span></span>
+     <div class="oh-ringrow"><div class="hr oh-ring">${rg}<div class="ctr"><b>${health}<span>%</span></b><small>${L('tap a ring name','ketik nama gelang')}</small></div></div>
+      <div class="oh-comps">${comps.map(c=>`<button class="oh-comp ${c.k===foc?'on':''}" data-oh-focus="${c.k}" aria-pressed="${c.k===foc}"><i class="c-${c.k}" style="background:currentColor"></i><span>${c.n}</span><b>${c.v}%</b></button>`).join('')}</div></div>
+     <div class="oh-detail"><p class="say" style="margin:0 0 8px">${detail.length?L(`What is pulling ${comps.find(c=>c.k===foc).n.toLowerCase()} down. Fixing all gives back +${gain(detail)} points.`,`Apa yang menarik ${comps.find(c=>c.k===foc).n.toLowerCase()} turun. Selesaikan semua dapat +${gain(detail)} mata.`):L('Nothing is dragging this down.','Tiada yang menarik ini turun.')}</p>
+      ${detail.map(d=>`<div class="oh-fix"><span>${d.t}</span><em>+${d.pts}</em><button class="btn" data-say="${esc(d.say)}">${d.b}</button></div>`).join('')}</div></div>
+    <div class="w oh-queue s7"><span class="cap">${L('Decision queue','Barisan keputusan')} <span class="pill ${pend.length+al.length?'warn':'ok'}">${pend.length+Math.min(3,al.length)}</span></span>${dq}</div>
+    ${kpi('cost',L('Cost today','Kos hari ini'),rm0(cost),spark(seriesN(7)),`${pct>=0?'+':''}${pct}% ${L('vs avg','dari purata')}`,pct>10?'warn':'ok')}
+    ${kpi('stock',L('Stock value','Nilai stok'),rm0(sv),spark(wob(7,7,sv)),L('actual','sebenar'))}
+    ${kpi('waste',L('Waste this week','Sisa minggu ini'),rm0(waste),spark(S.waste.map(w=>w.amt).reverse(),'var(--warn)'),L('actual','sebenar'),waste>30?'warn':'ok')}
+    ${kpi('waste',L('Money at risk','Wang berisiko'),rm0(exps.reduce((a,p)=>a+p.qty*p.cost,0)),`<span class="say" style="margin:0">${L('Expires within 3 days','Luput dalam 3 hari')}: ${exps.map(p=>pn(p)).join(', ')||'-'}</span>`,L('estimate','anggaran'),'warn')}
+    <div class="w oh-chart s8"><div class="an-tools"><span class="cap" style="margin-right:auto">${L('Cost activity','Aktiviti kos')}</span><div class="seg"><button data-range="7" aria-pressed="${S.range===7}">7D</button><button data-range="30" aria-pressed="${S.range===30}">30D</button></div></div>
+     <div class="an-read" id="an-read"><b>${rm0(ser[n-1])}</b><span>${L('Today','Hari ini')} · ${L('drag across the chart','seret pada carta')}</span></div>${chart}</div>
+    <div class="w oh-run s4"><span class="cap">${L('Stock runway','Landasan stok')} <span class="pill">${L('estimate','anggaran')}</span></span><div class="an-run">${run}</div><span class="say" style="margin:0">${L('Dark marker = supplier delivery time.','Penanda gelap = masa penghantaran pembekal.')}</span></div>
+    <div class="w s6"><span class="cap">${L('Team pulse','Denyut pasukan')}</span><div class="oh-team">${team}</div></div>
+    <div class="w s6"><span class="cap">${L("Today's timeline",'Garis masa hari ini')}</span><div class="oh-tls">${tlh}</div></div>
+    <div class="w oh-ask s12"><span class="cap">${ic('mic',14)} ${L('Ask SmartStock','Tanya SmartStock')}</span><div class="sug">${examples().slice(0,6).map(x=>`<button class="chip" data-say="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>
    </div>
    <p class="demo-note">${L('All figures are sample data for demonstration.','Semua nombor ialah data contoh untuk demo.')}</p>`;
   }
