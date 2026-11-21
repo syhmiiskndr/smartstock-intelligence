@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 // The URL and the public key come from the .env file (see .env.example).
 // Only the publishable / anon key belongs here. Never use the service_role or secret key in the web app.
 const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabaseConfigured = Boolean(url && key);
 
