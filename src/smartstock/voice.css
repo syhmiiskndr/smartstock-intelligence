@@ -661,3 +661,23 @@
 @media (prefers-color-scheme:dark){#ss-root:not([data-theme="light"]) .pl-kpi em.warn{color:#FF9F0A}#ss-root:not([data-theme="light"]) .pl-kpi em.ok{color:#30D158}}
 #ss-root[data-theme="dark"] .pl-kpi em.warn{color:#FF9F0A}#ss-root[data-theme="dark"] .pl-kpi em.ok{color:#30D158}
 @media(max-width:640px){#ss-root .pl-hero{padding:20px;border-radius:26px}#ss-root .pl-score{font-size:92px}#ss-root .pl-left{max-width:none}#ss-root .pl-story{padding:20px}#ss-root .pl-tile{height:120px}}
+
+/* ---- company setup, forms, team and supplier management ---- */
+#ss-root .lg-link{background:none;border:0;color:#9CD2FF;font:500 13.5px var(--font);cursor:pointer;padding:6px;text-align:center}
+#ss-root .lg-link:hover{text-decoration:underline}
+#ss-root .lg-tabs{display:flex;gap:8px}
+#ss-root .lg-tab{flex:1;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:600 14px var(--font);cursor:pointer}
+#ss-root .lg-tab[aria-pressed="true"]{background:rgba(10,132,255,.55);border-color:#5AC8FA}
+#ss-root .fm{display:flex;flex-direction:column;gap:10px;margin-top:12px;max-height:min(34vh,300px);overflow:auto;padding:2px}
+#ss-root .fm-f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500;color:var(--ink-2)}
+#ss-root .fm-f input,#ss-root .fm-f select{width:100%;box-sizing:border-box;height:42px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font:500 16px var(--font);outline:none}
+#ss-root .fm-f input:focus,#ss-root .fm-f select:focus{border-color:#0A84FF;box-shadow:0 0 0 3px rgba(10,132,255,.25)}
+#ss-root .fm-err{color:#FF453A;font-size:13px;min-height:1em;margin:0}
+#ss-root .h2-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#ss-root .add-btn{font-weight:600}
+#ss-root .av.tap{cursor:pointer}#ss-root .av.tap:hover{transform:translateY(-3px)}
+#ss-root .sup-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#ss-root .mng-x{border:0;background:var(--surface-2);color:var(--ink-2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:13px;line-height:1}
+#ss-root .mng-x:hover{background:rgba(255,69,58,.18);color:#FF453A}
+#ss-root .mng{display:flex;flex-direction:column;gap:6px;margin-top:12px;max-height:40vh;overflow:auto}
+#ss-root .mng>div{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:12px;background:var(--surface-2)}

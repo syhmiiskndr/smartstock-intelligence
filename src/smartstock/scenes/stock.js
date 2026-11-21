@@ -14,6 +14,7 @@ export default function stockScene(api) {
    S.pulse=null;
    const meta=api.canFin()?`${P.length} ${L('items','item')} · ${rm0(stockValue())}`:`${P.length} ${L('items','item')}`;
    return `${sh(L('Stock','Stok'),meta)}
+   ${S.live&&api.isMgr()?`<div class="row" style="margin-top:14px"><button class="btn add-btn" data-pp="addprod">+ ${L('Add item','Tambah item')}</button><button class="btn" data-pp="manage">${L('Remove items','Buang item')}</button></div>`:''}
    <div class="row" style="align-items:center;justify-content:space-between;margin-top:18px"><div class="seg" role="group" aria-label="${L('Filter','Tapis')}">
     <button data-filter="all" aria-pressed="${f==='all'}">${L('All','Semua')}</button><button data-filter="low" aria-pressed="${f==='low'}">${L('Low','Rendah')} ${ln}</button><button data-filter="exp" aria-pressed="${f==='exp'}">${L('Expiring','Luput')} ${en}</button></div>
     <div class="legend" style="margin:0"><span><i style="background:var(--r-stock)"></i>${L('Healthy','Baik')}</span><span><i style="background:var(--r-cover)"></i>${L('Expiring','Hampir luput')}</span><span><i style="background:var(--r-crit)"></i>${L('Low stock','Stok rendah')}</span></div></div>

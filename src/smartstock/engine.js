@@ -94,12 +94,12 @@ export function mountVoiceApp(host, opts = {}) {
   /* ---- live data (Supabase). The demo account keeps the sample data above. ---- */
   const SNAP=store.SNAP||(store.SNAP=JSON.stringify({P,use:S.use,series:S.series,requests:S.requests,waste:S.waste,tasks:S.tasks,moves:S.moves,orders:S.orders,fin:S.rules.adminFinance}));
   function restoreSample(){
-   const o=JSON.parse(SNAP);P.length=0;P.push(...o.P);Object.assign(S,{use:o.use,series:o.series,requests:o.requests,waste:o.waste,tasks:o.tasks,moves:o.moves,orders:o.orders,live:false,me:null,team:null});
+   const o=JSON.parse(SNAP);P.length=0;P.push(...o.P);Object.assign(S,{use:o.use,series:o.series,requests:o.requests,waste:o.waste,tasks:o.tasks,moves:o.moves,orders:o.orders,live:false,me:null,team:null,vendors:null,authMode:null});
    S.rules.adminFinance=o.fin;S.pl.sel=P[0].id;S.pl.used={};
   }
   function applyData(d){
    P.length=0;P.push(...d.products);
-   Object.assign(S,{use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:[],orders:[],tasks:[],live:true,me:d.me,team:d.team});
+   Object.assign(S,{use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:[],orders:[],tasks:[],live:true,me:d.me,team:d.team,vendors:d.vendors});
    S.rules.adminFinance=d.rules.adminFinance;S.pl.sel=P[0]?P[0].id:null;S.pl.used={};
   }
   const rehydrate=()=>DB.loadAll().then(d=>{applyData(d);if(S.user)refresh()});
@@ -108,6 +108,65 @@ export function mountVoiceApp(host, opts = {}) {
    if(!S.live)return;
    fn().then(rehydrate).catch(e=>{notify('bad',L('Not saved','Tidak disimpan'),String(e&&e.message||e));rehydrate().catch(()=>{})});
   }
+
+  /* ---- company setup and management forms (live accounts only) ---- */
+  const FM=(id,label,type,ph,val)=>`<label class="fm-f"><span>${label}</span><input id="fm-${id}" type="${type||'text'}" placeholder="${esc(ph||'')}" value="${esc(val||'')}" autocomplete="off" ${type==='number'?'inputmode="decimal" step="any"':''}></label>`;
+  const FMS=(id,label,opts)=>`<label class="fm-f"><span>${label}</span><select id="fm-${id}">${opts.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join('')}</select></label>`;
+  const fmErr=m=>{const e=$('#fm-err');if(e)e.textContent=m};
+  function fmPanel(o){
+   panel({state:o.state||'',title:o.title,body:o.body,persist:true,
+    html:`<div class="fm">${o.html}<p class="lg-err fm-err" id="fm-err" role="alert"></p></div>`,
+    actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:o.cta,kind:'ok',fn:()=>{
+     const v={};$$('#panel [id^="fm-"]').forEach(el=>{if(el.id!=='fm-err')v[el.id.slice(3)]=el.value.trim()});
+     const bad=o.check&&o.check(v);if(bad){fmErr(bad);return}
+     fmErr('');ppDone(o.run(v),o.done)}}]});
+   const f=$('#panel input');if(f)f.focus({preventScroll:true});
+  }
+  function ppDone(pr,msg){
+   return Promise.resolve(pr).then(rehydrate).then(()=>{hidePanel();notify('ok',msg,'')}).catch(e=>{
+    const m=String(e&&e.message||e);if($('#fm-err'))fmErr(m);else notify('bad',L('Not saved','Tidak disimpan'),m)});
+  }
+  function ppAct(a){
+   if(!S.live)return;
+   const [k,arg]=a.split(':'),own=isOwner(),mgr=isMgr();
+   if(k==='invite'&&mgr){
+    const mk=role=>DB.createInvite(role).then(code=>panel({state:L('Invite','Jemputan'),title:L('Invite code','Kod jemputan'),big:code,
+      body:L('Share this code. It works once and expires in 7 days. They register on the login page, choose "Join with code" and enter it.','Kongsi kod ini. Ia sah sekali sahaja dan tamat dalam 7 hari. Mereka daftar di halaman log masuk, pilih "Sertai dengan kod" dan masukkan kod ini.'),
+      persist:true,actions:[{label:L('Done','Selesai'),kind:'ok',fn:hidePanel}]})).catch(e=>notify('bad',L('Not created','Tidak dicipta'),String(e.message||e)));
+    panel({state:L('Invite','Jemputan'),title:L('Invite a team member','Jemput ahli pasukan'),body:L('Pick the role they will have.','Pilih peranan mereka.'),persist:true,
+     actions:[{label:L('Staff','Staf'),kind:'ok',fn:()=>mk('staff')},...(own?[{label:'Admin',fn:()=>mk('admin')}]:[])]});
+   }else if(k==='member'&&own){
+    const m=(S.team||[]).find(x=>x.id===arg);if(!m||m.id===S.me.id)return;
+    panel({state:roleName(m.role),title:m.name,body:m.email||'',persist:true,actions:[
+     ...(m.role!=='admin'?[{label:L('Make admin','Jadikan admin'),fn:()=>ppDone(DB.setMember(m.id,'admin',m.active),L('Role updated','Peranan dikemas kini'))}]:[]),
+     ...(m.role!=='staff'?[{label:L('Make staff','Jadikan staf'),fn:()=>ppDone(DB.setMember(m.id,'staff',m.active),L('Role updated','Peranan dikemas kini'))}]:[]),
+     {label:m.active?L('Deactivate','Nyahaktif'):L('Reactivate','Aktifkan semula'),fn:()=>ppDone(DB.setMember(m.id,m.role,!m.active),L('Updated','Dikemas kini'))}]});
+   }else if(k==='addsup'&&mgr){
+    fmPanel({state:L('New supplier','Pembekal baru'),title:L('Add a supplier','Tambah pembekal'),cta:L('Add','Tambah'),done:L('Supplier added','Pembekal ditambah'),
+     html:FM('name',L('Supplier name','Nama pembekal'),'text','Segar Jaya')+FM('contact',L('Contact person','Orang untuk dihubungi'))+FM('phone',L('Phone','Telefon'),'tel')+FM('lead',L('Delivery time (days)','Masa penghantaran (hari)'),'number','2','2'),
+     check:v=>v.name?'':L('Enter the supplier name.','Masukkan nama pembekal.'),run:v=>DB.addVendor(v)});
+   }else if(k==='delsup'&&mgr){
+    const v=(S.vendors||[]).find(x=>String(x.id)===arg);if(!v)return;
+    panel({state:L('Remove','Buang'),tone:'warn',title:L(`Remove ${v.name}?`,`Buang ${v.name}?`),body:L('Past stock and orders keep their history.','Stok dan order lepas kekal dalam sejarah.'),persist:true,
+     actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Remove','Buang'),kind:'ok',fn:()=>ppDone(DB.removeVendor(v.id),L('Supplier removed','Pembekal dibuang'))}]});
+   }else if(k==='addprod'&&mgr){
+    fmPanel({state:L('New item','Item baru'),title:L('Add an item','Tambah item'),cta:L('Add','Tambah'),done:L('Item added','Item ditambah'),
+     html:FM('name',L('Item name','Nama item'),'text','Epal Fuji')+FMS('unit',L('Unit','Unit'),[['kg','kg'],['g','g'],['pcs',L('pieces','biji')]])
+      +FM('reorder',L('Reorder level (alert below this)','Paras susun semula (amaran di bawah ini)'),'number','10')+FM('shelf',L('Shelf life (days)','Hayat simpanan (hari)'),'number','7')
+      +FM('price',L('Selling price (RM)','Harga jualan (RM)'),'number','')+FM('stock',L('Opening stock (optional)','Stok permulaan (pilihan)'),'number','')+FM('cost',L('Cost per unit, RM (optional)','Kos seunit, RM (pilihan)'),'number','')
+      +FMS('vendor',L('Supplier (optional)','Pembekal (pilihan)'),[['','-'],...(S.vendors||[]).map(v=>[v.id,v.name])]),
+     check:v=>!v.name?L('Enter the item name.','Masukkan nama item.'):(Number(v.shelf)<0||Number(v.stock)<0?L('Numbers cannot be negative.','Nombor tidak boleh negatif.'):''),run:v=>DB.addProduct(v)});
+   }else if(k==='manage'&&mgr){
+    panel({state:L('Items','Item'),title:L('Remove items','Buang item'),body:L('Tap ✕ to remove an item from the list. Its history stays.','Tekan ✕ untuk buang item. Sejarah kekal.'),persist:true,
+     html:`<div class="mng">${P.map(p=>`<div><span>${esc(pn(p))}</span><button class="mng-x" data-pp="delprod:${p.id}" aria-label="${L('Remove','Buang')} ${esc(pn(p))}">✕</button></div>`).join('')}</div>`,
+     actions:[{label:L('Done','Selesai'),kind:'ok',fn:hidePanel}]});
+   }else if(k==='delprod'&&mgr){
+    const p=prod(arg);if(!p)return;
+    panel({state:L('Remove','Buang'),tone:'warn',title:L(`Remove ${pn(p)}?`,`Buang ${pn(p)}?`),body:L(`${fq(p.qty)} ${U(p.unit)} is in stock. The item leaves the list; history stays.`,`${fq(p.qty)} ${U(p.unit)} dalam stok. Item keluar dari senarai; sejarah kekal.`),persist:true,
+     actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Remove','Buang'),kind:'ok',fn:()=>ppDone(DB.removeProduct(p.dbId),L('Item removed','Item dibuang'))}]});
+   }
+  }
+  track(document,'click',e=>{const b=e.target.closest('[data-pp]');if(b)ppAct(b.dataset.pp)});
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
@@ -777,6 +836,7 @@ export function mountVoiceApp(host, opts = {}) {
   /* Real accounts have one fixed role. Only the demo account (presentation mode) gets the Admin/Staff switch and the 1-minute demo. */
   const setDemoMode=on=>{S.demoMode=!!on;root.classList.toggle('demo-mode',!!on);if(on)requestAnimationFrame(()=>syncSegs())};
   function renderLogin(){
+   if(S.authMode==='register'||S.authMode==='setup')return renderAuthAlt();
    const keep=$('#lg-user')?{u:$('#lg-user').value,p:$('#lg-pass').value,f:document.activeElement&&document.activeElement.id}:null;
    $('#login').innerHTML=`<form class="lg-card" id="lg-form" novalidate>
      <i class="lg-av"><svg width="44" height="44" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="#0A84FF" stroke-width="3" stroke-dasharray="52 100" stroke-linecap="round" transform="rotate(-90 14 14)"/><circle cx="14" cy="14" r="6" fill="none" stroke="#34C759" stroke-width="3" stroke-dasharray="26 100" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg></i>
@@ -787,6 +847,8 @@ export function mountVoiceApp(host, opts = {}) {
      <p class="lg-err" id="lg-err" role="alert"></p>
      <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
      <p class="lg-hint">${DB.dataReady?'<b>owner</b> / <b>owner123</b> · <b>admin</b> / <b>admin123</b> · <b>staff</b> / <b>staff123</b>':'<b>owner</b> / <b>owner</b> · <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b>'}</p>
+     ${DB.dataReady?`<button class="lg-link" type="button" data-auth="register">${L('New company? Create an account','Syarikat baru? Cipta akaun')}</button>`:''}
+     ${S.authMsg?`<p class="lg-hint" role="status">${esc(S.authMsg)}</p>`:''}
      <p class="lg-hint lg-hint2"><b>demo</b> / <b>demo</b> · ${L('presentation mode, switch between Owner, Admin and Staff','mod pembentangan, tukar antara Pemilik, Admin dan Staf')}</p>
     </form>
     <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
@@ -811,8 +873,57 @@ export function mountVoiceApp(host, opts = {}) {
    const btn=form.querySelector('.lg-go');btn.disabled=true;btn.textContent=L('Signing in…','Log masuk…');
    if(acc){setTimeout(()=>{restoreSample();setDemoMode(acc.demo);enter(acc.role);setTimeout(renderLogin,1000)},350);return}
    DB.signIn(u,p).then(()=>DB.loadAll()).then(d=>{applyData(d);setDemoMode(false);enter(d.me.role);setTimeout(renderLogin,1000)})
-    .catch(e=>{DB.signOut();const m=String(e&&e.message||'');btn.disabled=false;btn.textContent=L('Sign in','Log masuk');
+    .catch(e=>{if(e&&e.code==='NO_COMPANY'){S.authMode='setup';S.setupTab='create';renderLogin();return}
+     DB.signOut();const m=String(e&&e.message||'');btn.disabled=false;btn.textContent=L('Sign in','Log masuk');
      fail(/no company/i.test(m)?L('This account has no company yet.','Akaun ini belum ada syarikat.'):/invalid login/i.test(m)?L('Wrong username or password.','Nama pengguna atau kata laluan salah.'):L('Could not sign in: ','Gagal log masuk: ')+m)});
+  });
+
+
+  /* register (step 1) and company setup (step 2: create a company or join with an invite code) */
+  function renderAuthAlt(){
+   const setup=S.authMode==='setup',tab=S.setupTab||'create';
+   const f=(id,label,type,ph)=>`<label class="lg-f"><span>${label}</span><input id="${id}" type="${type||'text'}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="${esc(ph||'')}"></label>`;
+   const body=!setup?`<h2 class="lg-title">${L('Create your account','Cipta akaun anda')}</h2><p class="lg-sub">${L('Step 1 of 2: your login','Langkah 1 daripada 2: log masuk anda')}</p>`
+      +f('rg-email',L('Email','E-mel'),'email','you@company.com')+f('rg-pass',L('Password (6 or more characters)','Kata laluan (6 aksara atau lebih)'),'password')
+     :`<h2 class="lg-title">${L('Set up your company','Sediakan syarikat anda')}</h2><p class="lg-sub">${L('Step 2 of 2','Langkah 2 daripada 2')}</p>
+      <div class="lg-tabs"><button type="button" class="lg-tab" data-stab="create" aria-pressed="${tab==='create'}">${L('New company','Syarikat baru')}</button><button type="button" class="lg-tab" data-stab="join" aria-pressed="${tab==='join'}">${L('Join with code','Sertai dengan kod')}</button></div>`
+      +(tab==='create'?f('su-company',L('Company name','Nama syarikat'),'text','Kedai Buah Segar')+f('su-reg',L('Registration number (optional)','No. pendaftaran (pilihan)'),'text','')
+        :f('su-code',L('Invite code','Kod jemputan'),'text','A1B2C3D4'))+f('su-name',L('Your name','Nama anda'),'text','');
+   $('#login').innerHTML=`<form class="lg-card" id="${setup?'su-form':'rg-form'}" novalidate>${body}<p class="lg-err" id="lg-err" role="alert"></p>
+     <button class="lg-go" type="submit">${setup?(tab==='create'?L('Create company','Cipta syarikat'):L('Join company','Sertai syarikat')):L('Continue','Teruskan')}</button>
+     <button class="lg-link" type="button" data-auth="${setup?'out':'login'}">${setup?L('Sign out','Log keluar'):L('Back to sign in','Kembali ke log masuk')}</button></form>
+    <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
+   setTimeout(()=>{const i=$('#login input');if(i)i.focus({preventScroll:true})},60);
+  }
+  const finishLogin=()=>DB.loadAll().then(d=>{applyData(d);S.authMode=null;S.authMsg='';setDemoMode(false);enter(d.me.role);setTimeout(renderLogin,1000)});
+  track(document,'click',e=>{
+   let b;
+   if(b=e.target.closest('#login [data-auth]')){const a=b.dataset.auth;S.authMsg='';
+    if(a==='out'){DB.signOut();S.authMode=null}else S.authMode=a==='register'?'register':null;renderLogin()}
+   if(b=e.target.closest('#login [data-stab]')){S.setupTab=b.dataset.stab;renderLogin()}
+  });
+  track(document,'submit',e=>{
+   const form=e.target;if(!form||(form.id!=='rg-form'&&form.id!=='su-form'))return;e.preventDefault();
+   const err=$('#lg-err'),btn=form.querySelector('.lg-go'),label=btn.textContent,v=id=>($('#'+id)?$('#'+id).value.trim():'');
+   const fail=m=>{err.textContent=m;btn.disabled=false;btn.textContent=label};
+   const busy=()=>{err.textContent='';btn.disabled=true;btn.textContent='…'};
+   if(form.id==='rg-form'){
+    const em=v('rg-email'),pw=$('#rg-pass').value;
+    if(!/^\S+@\S+\.\S+$/.test(em))return fail(L('Enter a valid email.','Masukkan e-mel yang sah.'));
+    if(pw.length<6)return fail(L('Password needs 6 or more characters.','Kata laluan perlu 6 aksara atau lebih.'));
+    busy();
+    DB.signUp(em,pw).then(d=>{
+     if(d.session){S.authMode='setup';S.setupTab='create'}
+     else{S.authMode=null;S.authMsg=L('Account created. Open the email we sent to confirm it, then sign in.','Akaun dicipta. Buka e-mel pengesahan, kemudian log masuk.')}
+     renderLogin()}).catch(x=>fail(String(x&&x.message||x)));
+    return;
+   }
+   const tab=S.setupTab||'create',nm=v('su-name');
+   if(tab==='create'&&!v('su-company'))return fail(L('Enter your company name.','Masukkan nama syarikat.'));
+   if(tab==='join'&&!v('su-code'))return fail(L('Enter the invite code.','Masukkan kod jemputan.'));
+   if(!nm)return fail(L('Enter your name.','Masukkan nama anda.'));
+   busy();
+   (tab==='create'?DB.createCompany(v('su-company'),v('su-reg'),nm):DB.joinCompany(v('su-code'),nm)).then(finishLogin).catch(x=>fail(String(x&&x.message||x)));
   });
 
   const _enter=enter;enter=role=>{const l=$('#login');l.classList.add('leave');setTimeout(()=>{l.classList.remove('leave');_enter(role)},600)};
@@ -870,7 +981,7 @@ export function mountVoiceApp(host, opts = {}) {
   if(opts.scene&&opts.scene!=='login')S.scene=opts.scene;
   S.demo=false;S.demoMode=false;
   renderLogin();$('#login').hidden=!!S.user;applyStatic();
-  if(DB.dataReady&&!S.user)DB.currentUser().then(u=>u&&!S.user?DB.loadAll().then(d=>{if(S.user)return;applyData(d);setDemoMode(false);enter(d.me.role)}):0).catch(()=>{});
+  if(DB.dataReady&&!S.user)DB.currentUser().then(u=>u&&!S.user?DB.loadAll().then(d=>{if(S.user)return;applyData(d);setDemoMode(false);enter(d.me.role)}):0).catch(e=>{if(e&&e.code==='NO_COMPANY'&&!S.user){S.authMode='setup';S.setupTab='create';renderLogin()}});
 
   render(true);startHints();syncSegs();
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(syncSegs);
