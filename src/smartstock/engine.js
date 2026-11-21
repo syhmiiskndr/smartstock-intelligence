@@ -3,6 +3,7 @@
  * mountVoiceApp() builds the UI once; pages call show(scene) to switch. */
 import './voice.css';
 import MARKUP from './markup.js';
+import * as DB from './data.js';
 
 const sceneModules = import.meta.glob('./scenes/*.js', { eager: true });
 const store = (globalThis.__smartstockVoice ||= {}); // keeps data and state while you move between pages
@@ -90,6 +91,23 @@ export function mountVoiceApp(host, opts = {}) {
   S.moves=[{p:'ayam',type:'usage',q:3,t:'08:40',who:'Syafiq'},{p:'susu',type:'receive',q:20,t:'07:55',who:'Hakim'},{p:'ayam',type:'receive',q:20,t:'Yesterday',who:'Hakim'},{p:'telur',type:'usage',q:30,t:'09:10',who:'Syafiq'},{p:'ayam',type:'usage',q:4,t:'10:25',who:'Syafiq'}];return S})());
   if(!S.an)S.an={metric:'cost',range:30,cmp:true,fc:true,cat:null};
   if(!S.pl)S.pl={sel:'ayam',day:0,used:{},filter:null,playing:false,shown:0,toast:''};
+  /* ---- live data (Supabase). The demo account keeps the sample data above. ---- */
+  const SNAP=store.SNAP||(store.SNAP=JSON.stringify({P,use:S.use,series:S.series,requests:S.requests,waste:S.waste,tasks:S.tasks,moves:S.moves,orders:S.orders,fin:S.rules.adminFinance}));
+  function restoreSample(){
+   const o=JSON.parse(SNAP);P.length=0;P.push(...o.P);Object.assign(S,{use:o.use,series:o.series,requests:o.requests,waste:o.waste,tasks:o.tasks,moves:o.moves,orders:o.orders,live:false,me:null,team:null});
+   S.rules.adminFinance=o.fin;S.pl.sel=P[0].id;S.pl.used={};
+  }
+  function applyData(d){
+   P.length=0;P.push(...d.products);
+   Object.assign(S,{use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:[],orders:[],tasks:[],live:true,me:d.me,team:d.team});
+   S.rules.adminFinance=d.rules.adminFinance;S.pl.sel=P[0]?P[0].id:null;S.pl.used={};
+  }
+  const rehydrate=()=>DB.loadAll().then(d=>{applyData(d);if(S.user)refresh()});
+  /* run a database write, then reload the real numbers; on error show it and reload so the screen never lies */
+  function dbw(fn){
+   if(!S.live)return;
+   fn().then(rehydrate).catch(e=>{notify('bad',L('Not saved','Tidak disimpan'),String(e&&e.message||e));rehydrate().catch(()=>{})});
+  }
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
@@ -100,7 +118,7 @@ export function mountVoiceApp(host, opts = {}) {
   const canFin=()=>S.role==='owner'||(S.role==='admin'&&!!S.rules.adminFinance);
   const ALLOW={owner:['home','analytics','stock','cost','fresh','ops','people','rules'],admin:['home','stock','fresh','ops','people'],staff:['home','stock','fresh']};
   const allowed=sc=>(ALLOW[S.role]||[]).includes(sc)||(sc==='cost'&&canFin());
-  const who=()=>({owner:'Syahmi',admin:'Aina',staff:'Syafiq'})[S.role]||'Syafiq';
+  const who=()=>S.live&&S.me?S.me.name:({owner:'Syahmi',admin:'Aina',staff:'Syafiq'})[S.role]||'Syafiq';
   const roleName=r=>r==='owner'?L('Owner','Pemilik'):r==='admin'?'Admin':L('Staff','Staf');
   const eta=p=>{const h=p.qty/p.avg*24;return h<1?L('under 1 hour','kurang 1 jam'):h<36?Math.round(h)+L(' hours',' jam'):(h/24).toFixed(1)+L(' days',' hari')};
   const suggest=p=>Math.max(10,Math.round((p.avg*2.5-p.qty)/10)*10);
@@ -292,7 +310,12 @@ export function mountVoiceApp(host, opts = {}) {
   /* ---- language: parse Malay + English, always both ---- */
   const norm=t=>t.toLowerCase().replace(/[.,!?'"“”]/g,' ').replace(/\s+/g,' ').trim();
   const SYN=[['ayam','ayam'],['chicken','ayam'],['tepung','tepung'],['flour','tepung'],['susu','susu'],['milk','susu'],['telur','telur'],['eggs','telur'],['egg','telur'],['beras','beras'],['rice','beras'],['minyak','minyak'],['oil','minyak'],['pisang','pisang'],['banana','pisang'],['bawang','bawang'],['onions','bawang'],['onion','bawang']];
-  const findItem=t=>{for(const [w,id] of SYN)if(new RegExp('\\b'+w+'\\b').test(t))return id;return null};
+  const FSYN=[['apple','epal'],['orange','oren'],['banana','pisang'],['watermelon','tembikai'],['papaya','betik'],['mango','mangga'],['grapes','anggur'],['grape','anggur'],['strawberry','strawberi'],['strawberries','strawberi'],['pineapple','nanas'],['guava','jambu']];
+  const findItem=t=>{
+   for(const [w,id] of SYN)if(prod(id)&&new RegExp('\\b'+w+'\\b').test(t))return id;
+   for(const [w,key] of FSYN)if(new RegExp('\\b'+w+'\\b').test(t)){const p=P.find(x=>norm(x.name).split(' ').includes(key));if(p)return p.id}
+   for(const p of P){const w=norm(p.name).split(' ')[0];if(w.length>2&&new RegExp('\\b'+w+'\\b').test(t))return p.id}
+   return null};
   const NW={setengah:.5,separuh:.5,half:.5,satu:1,one:1,dua:2,two:2,tiga:3,three:3,empat:4,four:4,lima:5,five:5,enam:6,six:6,tujuh:7,seven:7,lapan:8,eight:8,sembilan:9,nine:9,sepuluh:10,ten:10,'dua puluh':20,twenty:20,'tiga puluh':30,thirty:30,'lima puluh':50,fifty:50};
   const UR='(kilogram|kilos|kilo|kg|grams|gram|g|millilitre|ml|litres|litre|liters|liter|l|biji|butir|pcs|pieces|piece|keping)';
   const UM={kilogram:'kg',kilos:'kg',kilo:'kg',kg:'kg',grams:'g',gram:'g',g:'g',millilitre:'ml',ml:'ml',litres:'L',litre:'L',liters:'L',liter:'L',l:'L',biji:'biji',butir:'biji',pcs:'biji',pieces:'biji',piece:'biji',keping:'biji'};
@@ -393,19 +416,21 @@ export function mountVoiceApp(host, opts = {}) {
   function commit(){
    const d=S.draft;if(!d)return;S.draft=null;const p=prod(d.item),q=d.qty,amt=q*p.cost,before=p.qty,n=pn(p).toLowerCase();
    if(d.type==='usage'){
-    p.qty=r2(p.qty-q);S.use[p.id]+=q;tick('usage:'+p.id);addMove(p,'usage',q);
+    p.qty=r2(p.qty-q);S.use[p.id]+=q;tick('usage:'+p.id);addMove(p,'usage',q);dbw(()=>DB.usage(p,q));
     const crossed=before>p.reorder&&p.qty<=p.reorder&&S.rules.lowAlert;
     if(crossed)notify('bad',L('Low stock: '+pn(p),'Stok rendah: '+pn(p)),L(`${fq(p.qty)} ${U(p.unit)} left. Alert sent to admin.`,`Baki ${fq(p.qty)} ${U(p.unit)}. Amaran dihantar kepada admin.`));
     S.pulse=p.id;refresh();
     panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`${pn(p)}: ${fq(p.qty)} ${U(p.unit)} left`,`${pn(p)}: baki ${fq(p.qty)} ${U(p.unit)}`),body:canFin()?L(`Cost today ${rm(costToday())}.`,`Kos hari ini ${rm(costToday())}.`):L('Thanks. Cost is calculated automatically.','Terima kasih. Kos dikira automatik.'),
      html:crossed?`<div class="row"><span class="pill bad">${ic('alert',13)}${L('Low-stock alert sent to admin','Amaran stok rendah dihantar kepada admin')}</span></div>`:'',chips:crossed&&isMgr()?[{label:`Order ${suggest(p)} ${U(p.unit)}`,say:orderSay(p)}]:[],ttl:10000});
    }else if(d.type==='receive'){
+    if(S.live&&!isMgr()){dbw(()=>DB.requestStockIn(p,q));panel({state:L('Awaiting approval','Menunggu kelulusan'),tone:'warn',title:L('Sent to admin.','Dihantar kepada admin.'),body:L(`${fq(q)} ${U(p.unit)} ${pn(p).toLowerCase()} is added after an admin approves.`,`${fq(q)} ${U(p.unit)} ${pn(p).toLowerCase()} ditambah selepas admin lulus.`),ttl:7000});return}
+    if(S.live)dbw(()=>DB.receive(p,q));
     p.qty=r2(p.qty+q);tick('receive:'+p.id);addMove(p,'receive',q);receivePO(p);S.pulse=p.id;refresh();
     panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`${pn(p)}: ${fq(p.qty)} ${U(p.unit)} now`,`${pn(p)}: baki ${fq(p.qty)} ${U(p.unit)}`),body:L('New batch added with an expiry date.','Kelompok baru ditambah dengan tarikh luput.'),ttl:7000});
    }else if(d.type==='waste'){
     if(amt>S.rules.limit){addReq({kind:'writeoff',item:p.id,qty:q,amount:amt,by:isMgr()?who():'staff',rkey:'rep'});
      panel({state:L('Awaiting approval','Menunggu kelulusan'),tone:'warn',title:L('Sent to admin.','Dihantar kepada admin.'),body:L(`${rm(amt)} is above the automatic write-off limit.`,`${rm(amt)} melebihi had tulis-off automatik.`),ttl:7000})}
-    else{p.qty=r2(p.qty-q);addMove(p,'waste',q);S.waste.push({n:pn(p),amt});S.pulse=p.id;refresh();panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`Waste logged: ${fq(q)} ${U(p.unit)} ${n}.`,`Sisa ${fq(q)} ${U(p.unit)} ${n} direkod.`),body:L(`Waste cost ${rm(amt)}.`,`Kos sisa ${rm(amt)}.`),ttl:7000})}
+    else{p.qty=r2(p.qty-q);addMove(p,'waste',q);dbw(()=>DB.waste(p,q));S.waste.push({n:pn(p),amt});S.pulse=p.id;refresh();panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`Waste logged: ${fq(q)} ${U(p.unit)} ${n}.`,`Sisa ${fq(q)} ${U(p.unit)} ${n} direkod.`),body:L(`Waste cost ${rm(amt)}.`,`Kos sisa ${rm(amt)}.`),ttl:7000})}
    }else if(d.type==='order'){
     const dup=pending().find(r=>r.kind==='order'&&r.item===p.id);
     if(!dup)addReq({kind:'order',item:p.id,qty:q,amount:amt,supplier:p.sup,by:isMgr()?who():'staff',rkey:'low'});
@@ -422,7 +447,7 @@ export function mountVoiceApp(host, opts = {}) {
    if(!r)return panel({state:L('None','Tiada'),title:L('Nothing is waiting for approval.','Tiada kelulusan menunggu.'),ttl:3000});
    r.status=ok?'approved':'rejected';
    if(ok&&r.kind==='order')newPO(r);
-   if(ok&&r.kind==='writeoff'){const p=prod(r.item);p.qty=r2(Math.max(0,p.qty-r.qty));S.waste.push({n:pn(p),amt:r.amount})}
+   if(ok&&r.kind==='writeoff'){const p=prod(r.item);dbw(()=>DB.waste(p,r.qty));p.qty=r2(Math.max(0,p.qty-r.qty));S.waste.push({n:pn(p),amt:r.amount})}
    S.scene==='ops'?refresh():go('ops');
    panel({state:ok?L('Approved','Dilulus'):L('Rejected','Ditolak'),tone:ok?'ok':'bad',said,title:ok?(r.kind==='order'?L(`Order sent to ${r.supplier}.`,`Order dihantar kepada ${r.supplier}.`):L('Stock written off and waste cost calculated.','Stok ditulis-off dan kos sisa dikira.')):L('Request rejected and recorded.','Permintaan ditolak dan direkod.'),body:L('The action is in the audit trail.','Tindakan masuk jejak audit.'),chips:[{label:L('View trail','Lihat jejak'),fn:showAudit}],ttl:8000});
   }
@@ -639,9 +664,9 @@ export function mountVoiceApp(host, opts = {}) {
    if(b=e.target.closest('[data-enter]'))enter(b.dataset.enter);
    if(b=e.target.closest('[data-llang]'))setLang(S.lang==='ms'?'en':'ms');
   });
-  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.demo=false;setDemoMode(false);S.user=null;demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
+  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.demo=false;setDemoMode(false);S.user=null;if(S.live){DB.signOut();restoreSample()}demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
   function applyChrome(){
-   $('#biz').textContent=L('Dapur Syahmi · Melaka outlet','Dapur Syahmi · Cawangan Melaka');
+   $('#biz').textContent=S.live&&S.me&&S.me.company?S.me.company:L('Dapur Syahmi · Melaka outlet','Dapur Syahmi · Cawangan Melaka');
    $('#t-user').textContent=who()[0];$('#t-user').title=who()+' · '+roleName(S.role);
    $('#t-user').style.background=S.role==='owner'?'var(--accent)':S.role==='admin'?'#AF52DE':'var(--ok)';
    updateBell();
@@ -756,12 +781,12 @@ export function mountVoiceApp(host, opts = {}) {
    $('#login').innerHTML=`<form class="lg-card" id="lg-form" novalidate>
      <i class="lg-av"><svg width="44" height="44" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="#0A84FF" stroke-width="3" stroke-dasharray="52 100" stroke-linecap="round" transform="rotate(-90 14 14)"/><circle cx="14" cy="14" r="6" fill="none" stroke="#34C759" stroke-width="3" stroke-dasharray="26 100" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg></i>
      <h2 class="lg-title">${L('Sign in to SmartStock','Log masuk ke SmartStock')}</h2>
-     <p class="lg-sub">Dapur Syahmi · ${L('Melaka outlet','Cawangan Melaka')}</p>
+     <p class="lg-sub">${DB.dataReady?'SmartStock Intelligence':'Dapur Syahmi · '+L('Melaka outlet','Cawangan Melaka')}</p>
      <label class="lg-f"><span>${L('Username or email','Nama pengguna atau e-mel')}</span><input id="lg-user" name="username" autocomplete="username" enterkeyhint="next" autocapitalize="none" spellcheck="false"></label>
      <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password" enterkeyhint="go"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
      <p class="lg-err" id="lg-err" role="alert"></p>
      <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
-     <p class="lg-hint"><b>owner</b> / <b>owner</b> · <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b></p>
+     <p class="lg-hint">${DB.dataReady?'<b>owner</b> / <b>owner123</b> · <b>admin</b> / <b>admin123</b> · <b>staff</b> / <b>staff123</b>':'<b>owner</b> / <b>owner</b> · <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b>'}</p>
      <p class="lg-hint lg-hint2"><b>demo</b> / <b>demo</b> · ${L('presentation mode, switch between Owner, Admin and Staff','mod pembentangan, tukar antara Pemilik, Admin dan Staf')}</p>
     </form>
     <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
@@ -780,11 +805,14 @@ export function mountVoiceApp(host, opts = {}) {
    const u=$('#lg-user').value.trim().toLowerCase(),p=$('#lg-pass').value,err=$('#lg-err');
    const fail=msg=>{err.textContent=msg;form.classList.remove('shake');void form.offsetWidth;form.classList.add('shake');const i=$('#lg-pass');i.value='';i.focus()};
    if(!u||!p){fail(L('Enter your username and password.','Masukkan nama pengguna dan kata laluan.'));return}
-   const acc=ACCOUNTS.find(a=>a.user===u&&a.pass===p);
-   if(!acc){fail(L('Wrong username or password.','Nama pengguna atau kata laluan salah.'));return}
+   const acc=ACCOUNTS.find(a=>a.user===u&&a.pass===p&&(a.demo||!DB.dataReady));
+   if(!acc&&!DB.dataReady){fail(L('Wrong username or password.','Nama pengguna atau kata laluan salah.'));return}
    err.textContent='';
    const btn=form.querySelector('.lg-go');btn.disabled=true;btn.textContent=L('Signing in…','Log masuk…');
-   setTimeout(()=>{setDemoMode(acc.demo);enter(acc.role);setTimeout(renderLogin,1000)},350);
+   if(acc){setTimeout(()=>{restoreSample();setDemoMode(acc.demo);enter(acc.role);setTimeout(renderLogin,1000)},350);return}
+   DB.signIn(u,p).then(()=>DB.loadAll()).then(d=>{applyData(d);setDemoMode(false);enter(d.me.role);setTimeout(renderLogin,1000)})
+    .catch(e=>{DB.signOut();const m=String(e&&e.message||'');btn.disabled=false;btn.textContent=L('Sign in','Log masuk');
+     fail(/no company/i.test(m)?L('This account has no company yet.','Akaun ini belum ada syarikat.'):/invalid login/i.test(m)?L('Wrong username or password.','Nama pengguna atau kata laluan salah.'):L('Could not sign in: ','Gagal log masuk: ')+m)});
   });
 
   const _enter=enter;enter=role=>{const l=$('#login');l.classList.add('leave');setTimeout(()=>{l.classList.remove('leave');_enter(role)},600)};
@@ -842,6 +870,7 @@ export function mountVoiceApp(host, opts = {}) {
   if(opts.scene&&opts.scene!=='login')S.scene=opts.scene;
   S.demo=false;S.demoMode=false;
   renderLogin();$('#login').hidden=!!S.user;applyStatic();
+  if(DB.dataReady&&!S.user)DB.currentUser().then(u=>u&&!S.user?DB.loadAll().then(d=>{if(S.user)return;applyData(d);setDemoMode(false);enter(d.me.role)}):0).catch(()=>{});
 
   render(true);startHints();syncSegs();
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(syncSegs);
