@@ -39,9 +39,13 @@ alter table stock_transactions add constraint stock_transactions_transaction_typ
 alter table batches drop constraint if exists batches_status_check;
 alter table batches add constraint batches_status_check
   check (status in ('active','depleted','expired','discarded'));
+-- alerts: the team's checks (alerts_alert_type_check / alerts_alert_status_check) lack
+-- 'out_of_stock' and 'resolved'. Replace them with supersets (all their old values kept).
+alter table alerts drop constraint if exists alerts_alert_type_check;
+alter table alerts drop constraint if exists alerts_alert_status_check;
 alter table alerts drop constraint if exists alerts_type_check;
 alter table alerts add constraint alerts_type_check
-  check (alert_type in ('low_stock','out_of_stock','expiring_soon','expired'));
+  check (alert_type in ('low_stock','out_of_stock','expiring_soon','expired','spoilage_detected'));
 alter table alerts drop constraint if exists alerts_status_check;
 alter table alerts add constraint alerts_status_check
   check (alert_status in ('open','acknowledged','resolved'));
@@ -119,6 +123,7 @@ create index if not exists idx_tx_batch on stock_transactions(batch_id, created_
 create index if not exists idx_alerts_open on alerts(company_id, alert_status);
 create index if not exists idx_profiles_company on profiles(company_id);
 
+-- Note: record_waste reason must be one of spoiled | expired | damaged | other (team's check); anything else is stored as 'other'.
 -- ---------------------------------------------------------------------
 -- 3. Helper functions (read the caller's company / role)
 -- ---------------------------------------------------------------------
@@ -353,7 +358,7 @@ begin
     bid := _create_batch(c, r.product_id, r.vendor_id, r.quantity, r.unit_cost, r.expiry_date, r.submitted_by, r.notes);
     update stock_in_requests set status='approved', reviewed_by=auth.uid(), reviewed_at=now(), batch_id=bid where request_id = p_request;
   else
-    update stock_in_requests set status='rejected', reviewed_by=auth.uid(), reviewed_at=now(), rejection_reason=p_reason where request_id = p_request;
+    update stock_in_requests set status='rejected', reviewed_by=auth.uid(), reviewed_at=now(), rejection_reason=coalesce(nullif(trim(p_reason),''),'Rejected') where request_id = p_request;
   end if;
   return bid;
 end $$;
@@ -403,7 +408,8 @@ begin
   insert into stock_transactions(company_id, batch_id, user_id, transaction_type, quantity_change, notes)
     values (c, p_batch, auth.uid(), 'waste', -p_qty, p_reason) returning transaction_id into tx;
   insert into waste_records(company_id, transaction_id, batch_id, user_id, inspection_id, wasted_quantity, waste_cost, wasted_reason)
-    values (c, tx, p_batch, auth.uid(), p_inspection, p_qty, cost, p_reason) returning waste_id into wid;
+    values (c, tx, p_batch, auth.uid(), p_inspection, p_qty, cost,
+            case when p_reason in ('spoiled','expired','damaged') then p_reason else 'other' end) returning waste_id into wid;
   update batches set current_quantity = current_quantity - p_qty,
          status = case when current_quantity - p_qty <= 0 then 'depleted' else status end
    where batch_id = p_batch;

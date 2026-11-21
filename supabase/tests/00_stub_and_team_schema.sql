@@ -27,3 +27,20 @@ create table audit_logs(audit_id bigint generated always as identity primary key
 do $$ declare t text; begin
  for t in select tablename from pg_tables where schemaname='public' loop execute format('alter table %I enable row level security', t); end loop;
 end $$;
+
+-- team's real check constraints (from pg_constraint on their project)
+alter table products add constraint products_shelf_life_days_check check (shelf_life_days > 0);
+alter table products add constraint products_unit_of_measure_check check (unit_of_measure = any (array['kg','g','pcs']));
+alter table batches add constraint batches_check check (expiry_date is null or expiry_date >= received_date);
+alter table batches add constraint batches_current_quantity_check check (current_quantity >= 0);
+alter table batches add constraint batches_initial_quantity_check check (initial_quantity >= 0);
+alter table waste_records add constraint waste_records_wasted_quantity_check check (wasted_quantity > 0);
+alter table waste_records add constraint waste_records_wasted_reason_check check (wasted_reason = any (array['spoiled','expired','damaged','other']));
+alter table alerts add constraint alerts_alert_status_check check (alert_status = any (array['open','acknowledged']));
+alter table alerts add constraint alerts_alert_type_check check (alert_type = any (array['low_stock','expiring_soon','expired','spoilage_detected']));
+alter table stock_in_requests add constraint stock_in_requests_check check (status = any (array['pending','cancelled']) or (reviewed_by is not null and reviewed_at is not null));
+alter table stock_in_requests add constraint stock_in_requests_check1 check (status <> 'rejected' or rejection_reason is not null);
+alter table stock_in_requests add constraint stock_in_requests_check2 check (status <> 'approved' or batch_id is not null);
+alter table stock_in_requests add constraint stock_in_requests_quantity_check check (quantity > 0);
+alter table stock_in_requests add constraint stock_in_requests_status_check check (status = any (array['pending','approved','rejected','cancelled']));
+alter table inspections add constraint inspections_freshness_label_check check (freshness_label = any (array['fresh','spoiled']));
