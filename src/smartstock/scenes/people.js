@@ -22,7 +22,7 @@ export default function peopleScene(api) {
    };
    const sup=v=>{
     const names=v.items.map(id=>P.find(p=>p.id===String(id))).filter(Boolean);
-    return `<div class="sup"><div class="sup-h"><b>${esc(v.name)}</b>${mgr?`<button class="mng-x" data-pp="delsup:${v.id}" aria-label="${L('Remove','Buang')} ${esc(v.name)}">✕</button>`:''}</div>
+    return `<div class="sup"><div class="sup-h"><b>${esc(v.name)}</b>${mgr?`<span><button class="mng-x" data-pp="editsup:${v.id}" aria-label="${L('Edit','Edit')} ${esc(v.name)}">✎</button> <button class="mng-x" data-pp="delsup:${v.id}" aria-label="${L('Remove','Buang')} ${esc(v.name)}">✕</button></span>`:''}</div>
      <span class="meta" style="margin:0">${L('Delivers in','Penghantaran')} ${v.lead} ${L(v.lead===1?'day':'days','hari')}${v.contact?' · '+esc(v.contact):''}${v.phone?' · '+esc(v.phone):''}</span>
      <div class="row" style="margin:0">${names.length?names.map(p=>`<span class="pill">${esc(pn(p))}</span>`).join(''):`<span class="pill">${L('no stock yet','belum ada stok')}</span>`}</div></div>`;
    };
