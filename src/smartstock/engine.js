@@ -94,13 +94,23 @@ export function mountVoiceApp(host, opts = {}) {
   /* ---- live data (Supabase). The demo account keeps the sample data above. ---- */
   const SNAP=store.SNAP||(store.SNAP=JSON.stringify({P,use:S.use,series:S.series,requests:S.requests,waste:S.waste,tasks:S.tasks,moves:S.moves,orders:S.orders,fin:S.rules.adminFinance}));
   function restoreSample(){
-   const o=JSON.parse(SNAP);P.length=0;P.push(...o.P);Object.assign(S,{use:o.use,series:o.series,requests:o.requests,waste:o.waste,tasks:o.tasks,moves:o.moves,orders:o.orders,live:false,me:null,team:null,vendors:null,authMode:null});
+   const o=JSON.parse(SNAP);P.length=0;P.push(...o.P);Object.assign(S,{use:o.use,series:o.series,requests:o.requests,waste:o.waste,tasks:o.tasks,moves:o.moves,orders:o.orders,live:false,me:null,team:null,vendors:null,expired:null,authMode:null});S.notes=S.notes.filter(n=>!n.db);
    S.rules.adminFinance=o.fin;S.pl.sel=P[0].id;S.pl.used={};
+  }
+  function alertNote(a){
+   const p=prod(a.pid);if(!p)return null;const n=pn(p),t=new Date(a.t);
+   const m={low_stock:['warn',L('Low stock: '+n,'Stok rendah: '+n),L(`${fq(p.qty)} ${U(p.unit)} left.`,`Baki ${fq(p.qty)} ${U(p.unit)}.`)],
+    out_of_stock:['bad',L('Out of stock: '+n,'Stok habis: '+n),L('Order or receive stock.','Buat order atau terima stok.')],
+    expiring_soon:['warn',L('Expiring soon: '+n,'Hampir luput: '+n),L(`Expires in ${p.exp} days. Use it first.`,`Luput dalam ${p.exp} hari. Guna dahulu.`)],
+    expired:['bad',L('Expired: '+n,'Luput: '+n),L('Write off the expired stock.','Tulis-off stok yang luput.')]}[a.type];
+   return m?{tone:m[0],title:m[1],body:m[2],t,read:false,db:true,aid:a.id}:null;
   }
   function applyData(d){
    P.length=0;P.push(...d.products);
-   Object.assign(S,{use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:[],orders:[],tasks:[],live:true,me:d.me,team:d.team,vendors:d.vendors});
-   S.rules.adminFinance=d.rules.adminFinance;S.pl.sel=P[0]?P[0].id:null;S.pl.used={};
+   Object.assign(S,{use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:d.requests,orders:d.orders,tasks:[],live:true,me:d.me,team:d.team,vendors:d.vendors,expired:d.expired});
+   S.rules.adminFinance=d.rules.adminFinance;S.rules.limit=d.rules.limit;
+   if(!P.some(p=>p.id===S.pl.sel)){S.pl.sel=P[0]?P[0].id:null;S.pl.used={}}
+   S.notes=S.notes.filter(n=>!n.db).concat(d.alerts.map(alertNote).filter(Boolean));updateBell();
   }
   const rehydrate=()=>DB.loadAll().then(d=>{applyData(d);if(S.user)refresh()});
   /* run a database write, then reload the real numbers; on error show it and reload so the screen never lies */
@@ -111,7 +121,7 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* ---- company setup and management forms (live accounts only) ---- */
   const FM=(id,label,type,ph,val)=>`<label class="fm-f"><span>${label}</span><input id="fm-${id}" type="${type||'text'}" placeholder="${esc(ph||'')}" value="${esc(val||'')}" autocomplete="off" ${type==='number'?'inputmode="decimal" step="any"':''}></label>`;
-  const FMS=(id,label,opts)=>`<label class="fm-f"><span>${label}</span><select id="fm-${id}">${opts.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join('')}</select></label>`;
+  const FMS=(id,label,opts,sel)=>`<label class="fm-f"><span>${label}</span><select id="fm-${id}">${opts.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(sel)?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
   const fmErr=m=>{const e=$('#fm-err');if(e)e.textContent=m};
   function fmPanel(o){
    panel({state:o.state||'',title:o.title,body:o.body,persist:true,
@@ -157,13 +167,54 @@ export function mountVoiceApp(host, opts = {}) {
       +FMS('vendor',L('Supplier (optional)','Pembekal (pilihan)'),[['','-'],...(S.vendors||[]).map(v=>[v.id,v.name])]),
      check:v=>!v.name?L('Enter the item name.','Masukkan nama item.'):(Number(v.shelf)<0||Number(v.stock)<0?L('Numbers cannot be negative.','Nombor tidak boleh negatif.'):''),run:v=>DB.addProduct(v)});
    }else if(k==='manage'&&mgr){
-    panel({state:L('Items','Item'),title:L('Remove items','Buang item'),body:L('Tap ✕ to remove an item from the list. Its history stays.','Tekan ✕ untuk buang item. Sejarah kekal.'),persist:true,
-     html:`<div class="mng">${P.map(p=>`<div><span>${esc(pn(p))}</span><button class="mng-x" data-pp="delprod:${p.id}" aria-label="${L('Remove','Buang')} ${esc(pn(p))}">✕</button></div>`).join('')}</div>`,
+    panel({state:L('Items','Item'),title:L('Manage items','Urus item'),body:L('Tap ✎ to edit an item or ✕ to remove it. History stays.','Tekan ✎ untuk edit atau ✕ untuk buang. Sejarah kekal.'),persist:true,
+     html:`<div class="mng">${P.map(p=>`<div><span>${esc(pn(p))}</span><span><button class="mng-x" data-pp="editprod:${p.id}" aria-label="${L('Edit','Edit')} ${esc(pn(p))}">✎</button> <button class="mng-x" data-pp="delprod:${p.id}" aria-label="${L('Remove','Buang')} ${esc(pn(p))}">✕</button></span></div>`).join('')}</div>`,
      actions:[{label:L('Done','Selesai'),kind:'ok',fn:hidePanel}]});
    }else if(k==='delprod'&&mgr){
     const p=prod(arg);if(!p)return;
     panel({state:L('Remove','Buang'),tone:'warn',title:L(`Remove ${pn(p)}?`,`Buang ${pn(p)}?`),body:L(`${fq(p.qty)} ${U(p.unit)} is in stock. The item leaves the list; history stays.`,`${fq(p.qty)} ${U(p.unit)} dalam stok. Item keluar dari senarai; sejarah kekal.`),persist:true,
      actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Remove','Buang'),kind:'ok',fn:()=>ppDone(DB.removeProduct(p.dbId),L('Item removed','Item dibuang'))}]});
+   }else if(k==='recv'){
+    const p0=prod(arg)||P[0];if(!p0)return;
+    const t=isMgr(),fin=canFin();
+    fmPanel({state:L('Receive stock','Terima stok'),title:t?L('Receive stock','Terima stok'):L('Report a delivery','Lapor penghantaran'),
+     body:t?'':L('An admin approves it before stock is added.','Admin lulus dahulu sebelum stok ditambah.'),cta:t?L('Receive','Terima'):L('Send to admin','Hantar kepada admin'),
+     done:t?L('Stock received','Stok diterima'):L('Sent to admin','Dihantar kepada admin'),
+     html:FMS('item',L('Item','Item'),P.map(x=>[x.id,pn(x)]),p0.id)+FM('qty',L('Quantity received','Kuantiti diterima'),'number','0')
+      +FMS('vendor',L('Supplier','Pembekal'),[['','-'],...(S.vendors||[]).map(v=>[v.id,v.name])],p0.supId||'')
+      +(fin||t?FM('cost',L('Cost per unit (RM)','Kos seunit (RM)'),'number','',p0.cost?String(Math.round(p0.cost*100)/100):''):'')
+      +FM('expiry',L('Expiry date (leave empty to use shelf life)','Tarikh luput (kosongkan untuk guna hayat simpanan)'),'date','',''),
+     check:v=>!(Number(v.qty)>0)?L('Enter the quantity received.','Masukkan kuantiti diterima.'):(v.expiry&&v.expiry<new Date().toISOString().slice(0,10)?L('Expiry date is in the past.','Tarikh luput telah lepas.'):''),
+     run:v=>{const x=prod(v.item),o={vendorId:v.vendor?Number(v.vendor):null,cost:v.cost===''||v.cost==null?null:Number(v.cost),expiry:v.expiry||null};
+      return t?DB.receive(x,Number(v.qty),o):DB.requestStockIn(x,Number(v.qty),o)}});
+   }else if(k==='count'&&mgr){
+    fmPanel({state:L('Stock count','Kiraan stok'),title:L('Count your stock','Kira stok anda'),body:L('Fill in only the items you counted. The difference is recorded.','Isi item yang dikira sahaja. Perbezaan direkod.'),
+     cta:L('Save count','Simpan kiraan'),done:L('Stock count saved','Kiraan stok disimpan'),
+     html:P.map(x=>FM('c-'+x.dbId,`${esc(pn(x))} (${L('system','sistem')}: ${fq(x.qty)} ${U(x.unit)})`,'number','')).join('')
+      +FMS('why',L('Reason','Sebab'),[['stock count',L('Regular count','Kiraan biasa')],['damaged',L('Damaged or lost','Rosak atau hilang')],['found',L('Found extra','Jumpa lebihan')],['other',L('Other','Lain-lain')]]),
+     check:v=>P.some(x=>v['c-'+x.dbId]!==''&&Number(v['c-'+x.dbId])>=0)?'':L('Enter at least one counted quantity.','Masukkan sekurang-kurangnya satu kuantiti.'),
+     run:v=>P.filter(x=>v['c-'+x.dbId]!==''&&Number(v['c-'+x.dbId])>=0).reduce((pr,x)=>pr.then(()=>DB.adjust(x,Number(v['c-'+x.dbId]),v.why)),Promise.resolve())});
+   }else if(k==='wexp'&&mgr){
+    const e=S.expired||{n:0,value:0};if(!e.n)return;
+    panel({state:L('Expired','Luput'),tone:'warn',title:L(`Write off ${e.n} expired batch${e.n>1?'es':''}?`,`Tulis-off ${e.n} kelompok luput?`),
+     body:(canFin()?L(`Worth about ${rm0(e.value)}. `,`Bernilai kira-kira ${rm0(e.value)}. `):'')+L('The loss is recorded as waste.','Kerugian direkod sebagai sisa.'),persist:true,
+     actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Write off','Tulis-off'),kind:'ok',fn:()=>ppDone(DB.writeOffExpired(),L('Expired stock written off','Stok luput ditulis-off'))}]});
+   }else if(k==='editprod'&&mgr){
+    const p=prod(arg);if(!p)return;
+    fmPanel({state:L('Edit item','Edit item'),title:pn(p),cta:L('Save','Simpan'),done:L('Item updated','Item dikemas kini'),
+     html:FM('name',L('Item name','Nama item'),'text','',p.name)+FMS('unit',L('Unit','Unit'),[['kg','kg'],['g','g'],['pcs',L('pieces','biji')]],p.unit==='biji'?'pcs':'kg')
+      +FM('reorder',L('Reorder level','Paras susun semula'),'number','',String(p.reorder))+FM('shelf',L('Shelf life (days)','Hayat simpanan (hari)'),'number','',p.shelf?String(p.shelf):''),
+     check:v=>v.name?'':L('Enter the item name.','Masukkan nama item.'),run:v=>DB.updateProduct(p.dbId,v)});
+   }else if(k==='editsup'&&mgr){
+    const v0=(S.vendors||[]).find(x=>String(x.id)===arg);if(!v0)return;
+    fmPanel({state:L('Edit supplier','Edit pembekal'),title:v0.name,cta:L('Save','Simpan'),done:L('Supplier updated','Pembekal dikemas kini'),
+     html:FM('name',L('Supplier name','Nama pembekal'),'text','',v0.name)+FM('contact',L('Contact person','Orang untuk dihubungi'),'text','',v0.contact)+FM('phone',L('Phone','Telefon'),'tel','',v0.phone)+FM('lead',L('Delivery time (days)','Masa penghantaran (hari)'),'number','',String(v0.lead)),
+     check:v=>v.name?'':L('Enter the supplier name.','Masukkan nama pembekal.'),run:v=>DB.updateVendor(v0.id,v)});
+   }else if(k==='recvpo'&&mgr){
+    ppDone(DB.receivePO(Number(arg)),L('Order received. Stock updated.','Order diterima. Stok dikemas kini.'));
+   }else if(k==='cancelpo'&&mgr){
+    panel({state:L('Cancel','Batal'),tone:'warn',title:L('Cancel this order?','Batalkan order ini?'),persist:true,
+     actions:[{label:L('Keep','Kekal'),fn:hidePanel},{label:L('Cancel order','Batal order'),kind:'ok',fn:()=>ppDone(DB.cancelPO(Number(arg)),L('Order cancelled','Order dibatalkan'))}]});
    }
   }
   track(document,'click',e=>{const b=e.target.closest('[data-pp]');if(b)ppAct(b.dataset.pp)});
@@ -188,15 +239,18 @@ export function mountVoiceApp(host, opts = {}) {
        staff:['We used 2 kg chicken','Receive 10 litres milk','Waste 1 kg banana','Scan banana','Open stock']}
   };
   EX.ms.owner=EX.ms.admin;EX.en.owner=EX.en.admin;
-  const examples=()=>EX[S.lang][S.role].filter(x=>canFin()||!/kos|cost/i.test(x));
+  // live accounts: swap the sample product names in the hints for the company's own items
+  const liveHint=x=>{if(!S.live||!P.length)return x;const a=pn(P[0]).toLowerCase(),b=pn(P[Math.min(1,P.length-1)]).toLowerCase();
+   return x.replace(/chicken|ayam/gi,a).replace(/banana|pisang|milk|susu/gi,b)};
+  const examples=()=>EX[S.lang][S.role].filter(x=>canFin()||!/kos|cost/i.test(x)).map(liveHint);
 
   /* ---- scenes ---- */
   const greet=()=>{const h=new Date().getHours();return h<11?L('Good morning','Selamat pagi'):h<15?L('Good afternoon','Selamat tengah hari'):h<19?L('Good evening','Selamat petang'):L('Good evening','Selamat malam')};
   const sh=(t,m)=>`<div class="sh"><h1 class="h1">${t}</h1><p class="meta">${m}</p></div>`;
   const sayHint=t=>`<span class="say">${L('or say','atau sebut')} <q>${esc(t)}</q></span>`;
   const orderSay=p=>`Order ${suggest(p)} ${uw(p.unit)} ${pn(p).toLowerCase()}`;
-  const reqTitle=r=>{const p=prod(r.item),a=`${fq(r.qty)} ${U(p.unit)} ${pn(p)}`;return r.kind==='order'?`Order ${a}`:L(`Write off ${a}`,`Tulis-off ${a}`)};
-  const reqReason=r=>{const p=prod(r.item);return r.rkey==='exp'?L('Expired','Luput'):r.rkey==='rep'?L('Reported spoiled','Dilapor rosak'):L('Runs out in ','Habis dalam ')+eta(p)};
+  const reqTitle=r=>{const p=prod(r.item),a=`${fq(r.qty)} ${U(p.unit)} ${pn(p)}`;return r.kind==='order'?`Order ${a}`:r.kind==='stockin'?L(`Receive ${a}`,`Terima ${a}`):L(`Write off ${a}`,`Tulis-off ${a}`)};
+  const reqReason=r=>{const p=prod(r.item);return r.rkey==='in'?L('Staff delivery','Penghantaran staf'):r.rkey==='exp'?L('Expired','Luput'):r.rkey==='rep'?L('Reported spoiled','Dilapor rosak'):L('Runs out in ','Habis dalam ')+eta(p)};
   const byName=b=>b==='staff'?L('Staff','Staf'):b;
 
 
@@ -487,12 +541,12 @@ export function mountVoiceApp(host, opts = {}) {
     p.qty=r2(p.qty+q);tick('receive:'+p.id);addMove(p,'receive',q);receivePO(p);S.pulse=p.id;refresh();
     panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`${pn(p)}: ${fq(p.qty)} ${U(p.unit)} now`,`${pn(p)}: baki ${fq(p.qty)} ${U(p.unit)}`),body:L('New batch added with an expiry date.','Kelompok baru ditambah dengan tarikh luput.'),ttl:7000});
    }else if(d.type==='waste'){
-    if(amt>S.rules.limit){addReq({kind:'writeoff',item:p.id,qty:q,amount:amt,by:isMgr()?who():'staff',rkey:'rep'});
+    if(amt>S.rules.limit){if(S.live)dbw(()=>DB.requestWaste(p,q));else addReq({kind:'writeoff',item:p.id,qty:q,amount:amt,by:isMgr()?who():'staff',rkey:'rep'});
      panel({state:L('Awaiting approval','Menunggu kelulusan'),tone:'warn',title:L('Sent to admin.','Dihantar kepada admin.'),body:L(`${rm(amt)} is above the automatic write-off limit.`,`${rm(amt)} melebihi had tulis-off automatik.`),ttl:7000})}
     else{p.qty=r2(p.qty-q);addMove(p,'waste',q);dbw(()=>DB.waste(p,q));S.waste.push({n:pn(p),amt});S.pulse=p.id;refresh();panel({state:L('Recorded','Direkod'),tone:'ok',title:L(`Waste logged: ${fq(q)} ${U(p.unit)} ${n}.`,`Sisa ${fq(q)} ${U(p.unit)} ${n} direkod.`),body:L(`Waste cost ${rm(amt)}.`,`Kos sisa ${rm(amt)}.`),ttl:7000})}
    }else if(d.type==='order'){
     const dup=pending().find(r=>r.kind==='order'&&r.item===p.id);
-    if(!dup)addReq({kind:'order',item:p.id,qty:q,amount:amt,supplier:p.sup,by:isMgr()?who():'staff',rkey:'low'});
+    if(!dup){if(S.live)dbw(()=>DB.requestPO(p,q));else addReq({kind:'order',item:p.id,qty:q,amount:amt,supplier:p.sup,by:isMgr()?who():'staff',rkey:'low'})}
     if(isMgr()){go('ops');setTimeout(()=>panel({state:dup?L('Already waiting','Sudah menunggu'):L('Awaiting approval','Menunggu kelulusan'),tone:'warn',title:L(`The ${n} order is on the top card.`,`Order ${n} ada di kad atas.`),ttl:5000}),900)}
     else panel({state:L('Sent','Dihantar'),tone:'ok',title:L('Order suggestion sent to admin.','Cadangan order dihantar kepada admin.'),ttl:6000});
    }
@@ -504,6 +558,16 @@ export function mountVoiceApp(host, opts = {}) {
    if(!isMgr())return panel({state:L('No access','Tiada akses'),tone:'bad',title:L('Only admins can approve.','Hanya admin boleh meluluskan.'),ttl:4000});
    const r=pending()[0];
    if(!r)return panel({state:L('None','Tiada'),title:L('Nothing is waiting for approval.','Tiada kelulusan menunggu.'),ttl:3000});
+   if(S.live){
+    const q=r.db;if(!q)return;
+    (q.t==='stockin'?DB.reviewStockIn(q.id,ok,ok?null:'Rejected'):DB.decideApproval(q.id,ok,ok?null:'Rejected')).then(rehydrate).then(()=>{
+     S.scene==='ops'?refresh():go('ops');
+     panel({state:ok?L('Approved','Dilulus'):L('Rejected','Ditolak'),tone:ok?'ok':'bad',said,
+      title:ok?(r.kind==='order'?L(`Order sent to ${r.supplier}.`,`Order dihantar kepada ${r.supplier}.`):r.kind==='stockin'?L('Stock received and batch recorded.','Stok diterima dan kelompok direkod.'):L('Stock written off and waste cost calculated.','Stok ditulis-off dan kos sisa dikira.')):L('Request rejected and recorded.','Permintaan ditolak dan direkod.'),
+      body:L('The action is in the audit trail.','Tindakan masuk jejak audit.'),ttl:6000})
+    }).catch(e=>notify('bad',L('Not saved','Tidak disimpan'),String(e&&e.message||e)));
+    return;
+   }
    r.status=ok?'approved':'rejected';
    if(ok&&r.kind==='order')newPO(r);
    if(ok&&r.kind==='writeoff'){const p=prod(r.item);dbw(()=>DB.waste(p,r.qty));p.qty=r2(Math.max(0,p.qty-r.qty));S.waste.push({n:pn(p),amt:r.amount})}
@@ -616,6 +680,7 @@ export function mountVoiceApp(host, opts = {}) {
   }
 
   function showNotes(){
+   if(S.live){const ids=S.notes.filter(n=>n.aid&&!n.read).map(n=>n.aid);if(ids.length)DB.ackAlerts(ids).catch(()=>{})}
    S.notes.forEach(n=>n.read=true);updateBell();
    const rows=S.notes.length?S.notes.slice(0,8).map(n=>`<div><i class="${n.tone}"></i><span><b>${esc(n.title)}</b>${esc(n.body)}</span><time>${hhmm(n.t)}</time></div>`).join(''):`<p class="p-body">${L('Nothing yet. SmartStock will alert you about low stock, expiry and orders.','Belum ada. SmartStock akan beri amaran stok rendah, luput dan order.')}</p>`;
    panel({state:L('Notifications','Notifikasi'),title:L('What needs your attention','Apa yang perlukan perhatian'),html:`<div class="nl">${rows}</div>`,persist:true});
@@ -665,6 +730,7 @@ export function mountVoiceApp(host, opts = {}) {
   /* purchase order tracking */
   const STEPS=()=>[L('Approved','Dilulus'),L('Sent','Dihantar'),L('Confirmed','Disahkan'),L('Delivered','Tiba')];
   function newPO(r){
+   if(S.live){const q=prod(r.item);dbw(()=>DB.createPO(q,r.qty));notify('ok',L('Order placed','Order dibuat'),L(`${fq(r.qty)} ${U(q.unit)} ${pn(q).toLowerCase()} to ${r.supplier||q.sup}.`,`${fq(r.qty)} ${U(q.unit)} ${pn(q).toLowerCase()} kepada ${r.supplier||q.sup}.`));return}
    const p=prod(r.item),po={no:1042+S.orders.length,item:p.id,qty:r.qty,sup:r.supplier||p.sup,step:1,done:false};S.orders.unshift(po);
    notify('ok',L(`PO #${po.no} sent`,`PO #${po.no} dihantar`),L(`${fq(po.qty)} ${U(p.unit)} ${pn(p).toLowerCase()} to ${po.sup}.`,`${fq(po.qty)} ${U(p.unit)} ${pn(p).toLowerCase()} kepada ${po.sup}.`));
    later(()=>{po.step=2;notify('ok',L(`${po.sup} confirmed`,`${po.sup} sahkan`),L('Delivery tomorrow, 8 am.','Penghantaran esok, 8 pagi.'));if(S.scene==='ops')refresh()},7000);
@@ -676,7 +742,7 @@ export function mountVoiceApp(host, opts = {}) {
    return `<h2 class="h2">${L('Order tracking','Penjejakan order')}</h2>`+S.orders.map(o=>{const p=prod(o.item),st=STEPS();
     return `<div class="po"><div class="po-h"><b>PO #${o.no} · ${fq(o.qty)} ${U(p.unit)} ${pn(p)}</b><span class="pill ${o.done?'ok':''}">${o.done?L('Received','Diterima'):o.sup}</span></div>
     <div class="steps">${st.map((s,i)=>`<div class="st ${i<=o.step||o.done?'on':''}"><i></i>${s}</div>`).join('')}</div>
-    ${o.step===3&&!o.done?`<div class="row"><button class="btn primary" data-say="${L('Receive','Terima')} ${fq(o.qty)} ${uw(p.unit)} ${pn(p).toLowerCase()}">${L('Receive stock','Terima stok')}</button></div>`:''}</div>`}).join('');
+    ${S.live?(!o.done&&isMgr()?`<div class="row"><button class="btn primary" data-pp="recvpo:${o.poId}">${L('Receive stock','Terima stok')}</button><button class="btn" data-pp="cancelpo:${o.poId}">${L('Cancel order','Batal order')}</button></div>`:''):o.step===3&&!o.done?`<div class="row"><button class="btn primary" data-say="${L('Receive','Terima')} ${fq(o.qty)} ${uw(p.unit)} ${pn(p).toLowerCase()}">${L('Receive stock','Terima stok')}</button></div>`:''}</div>`}).join('');
   }
 
 
@@ -713,7 +779,8 @@ export function mountVoiceApp(host, opts = {}) {
    S.role=role;S.scene='home';if(opts.onNavigate)opts.onNavigate('home');S.filter='all';S.draft=null;S.user=role;$('#login').hidden=true;
    $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.role===role));
    render(true);startHints();applyChrome();clearLive();
-   if(role!=='staff'){
+   if(S.live){/* real accounts get real alerts from the database, no scripted demo notifications */}
+   else if(role!=='staff'){
     later(()=>{if(S.rules.expAlert)notify('warn',L('Milk batch B-MI-204 expires in 3 days','Kelompok susu B-MI-204 luput dalam 3 hari'),L('Use it first, or schedule a promotion.','Guna dahulu, atau jalankan promosi.'))},4500);
     later(()=>{if(S.rules.anomaly)notify('warn',L('Unusual chicken usage','Penggunaan ayam luar biasa'),L('Used 56% above the normal daily rate.','Digunakan 56% melebihi kadar harian biasa.'))},10000);
    }else later(()=>notify('ok',L('New task assigned','Tugas baru diberikan'),L('Check banana freshness before 10 am.','Semak kesegaran pisang sebelum 10 pagi.')),5000);

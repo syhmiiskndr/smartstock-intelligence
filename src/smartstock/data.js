@@ -42,7 +42,10 @@ export async function loadAll() {
   const since14 = new Date(Date.now() - 14 * 864e5).toISOString();
   const since7 = new Date(Date.now() - 7 * 864e5).toISOString();
 
-  const [profiles, companies, overview, batches, txs, wastes, settings, vendors] = await Promise.all([
+  // refresh alerts first so the list below is current (ignore failures: alerts are a convenience)
+  try { await supabase.rpc('refresh_alerts'); } catch (e) { /* ignore */ }
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ] = await Promise.all([
     supabase.from('profiles').select('user_id, full_name, role, company_id, is_active, email'),
     supabase.from('companies').select('company_id, company_name'),
     supabase.from('product_overview').select('*').order('product_name'),
@@ -54,9 +57,17 @@ export async function loadAll() {
     supabase.from('waste_records').select('waste_cost, recorded_at, batches(product_id)').gte('recorded_at', since7),
     supabase.from('company_settings').select('*').maybeSingle(),
     supabase.from('vendors').select('vendor_id, vendor_name, contact_person_name, phone_number, lead_time_days').is('deleted_at', null).order('vendor_name'),
+    supabase.from('alerts').select('alert_id, alert_type, product_id, created_at').eq('alert_status', 'open').order('created_at', { ascending: false }).limit(30),
+    supabase.from('approvals').select('approval_id, kind, payload, requested_by, created_at').eq('status', 'pending').order('created_at', { ascending: false }),
+    supabase.from('stock_in_requests').select('request_id, submitted_by, product_id, vendor_id, quantity, unit_cost, created_at').eq('status', 'pending').order('created_at', { ascending: false }),
+    supabase.from('purchase_orders').select('po_id, status, created_at, expected_date, vendors(vendor_name), purchase_order_items(product_id, quantity, unit_cost)')
+      .in('status', ['ordered', 'received']).order('created_at', { ascending: false }).limit(20),
+    supabase.from('batches').select('product_id, current_quantity, unit_cost').in('status', ['active', 'expired']).is('deleted_at', null)
+      .gt('current_quantity', 0).lt('expiry_date', todayISO),
   ]);
   const prof = orThrow(profiles), comp = orThrow(companies), ov = orThrow(overview), bat = orThrow(batches),
     tx = orThrow(txs), ws = orThrow(wastes), vend = orThrow(vendors);
+  const alertRows = alertsQ.data || [], apprRows = approvalsQ.data || [], inRows = stockInQ.data || [], poRows = posQ.data || [], expRows = expiredQ.data || [];
   const st = settings.data || {};
   const meRow = prof.find((p) => p.user_id === user.id);
   if (!meRow) { const e = new Error('This account has no company yet.'); e.code = 'NO_COMPANY'; throw e; }
@@ -78,6 +89,7 @@ export async function loadAll() {
       id: String(p.product_id), dbId: p.product_id,
       name, en: FRUIT_EN[name.toLowerCase()] || name,
       unit: UNIT[p.unit_of_measure] || 'kg',
+      shelf: p.shelf_life_days || null,
       qty: num(p.on_hand), cap: num(p.capacity) || reorder * 4, reorder,
       cost: a.q > 0 ? a.v / a.q : 0,
       exp: p.next_expiry ? Math.max(0, dayDiff(p.next_expiry, new Date())) : 999,
@@ -111,6 +123,35 @@ export async function loadAll() {
   let waste = Object.entries(wmap).map(([n, amt]) => ({ n, amt })).sort((a, b) => b.amt - a.amt);
   if (!waste.length) waste = [{ n: '-', amt: 0.01 }];
 
+  const vname = Object.fromEntries(vend.map((v) => [v.vendor_id, v.vendor_name]));
+  const requests = [];
+  for (const a of apprRows) {
+    const pl = a.payload || {};
+    if (a.kind === 'purchase_order') {
+      const it = (pl.items && pl.items[0]) || {}; const pr = pid[it.product_id]; if (!pr) continue;
+      requests.push({ id: 'a' + a.approval_id, db: { t: 'approval', id: a.approval_id }, kind: 'order', item: pr.id, qty: num(it.quantity),
+        amount: num(it.quantity) * (num(it.unit_cost) || pr.cost), supplier: vname[pl.vendor_id] || pr.sup, by: names[a.requested_by] || 'Staff', rkey: 'low', status: 'pending' });
+    } else if (a.kind === 'waste') {
+      const pr = pid[pl.product_id]; if (!pr) continue;
+      requests.push({ id: 'a' + a.approval_id, db: { t: 'approval', id: a.approval_id }, kind: 'writeoff', item: pr.id, qty: num(pl.qty),
+        amount: num(pl.qty) * pr.cost, by: names[a.requested_by] || 'Staff', rkey: pl.reason === 'expired' ? 'exp' : 'rep', status: 'pending' });
+    }
+  }
+  for (const r of inRows) {
+    const pr = pid[r.product_id]; if (!pr) continue;
+    requests.push({ id: 's' + r.request_id, db: { t: 'stockin', id: r.request_id }, kind: 'stockin', item: pr.id, qty: num(r.quantity),
+      amount: num(r.quantity) * (num(r.unit_cost) || pr.cost), supplier: vname[r.vendor_id] || pr.sup, by: names[r.submitted_by] || 'Staff', rkey: 'in', status: 'pending' });
+  }
+  const orders = [];
+  for (const o of poRows) {
+    const it = (o.purchase_order_items || [])[0]; const pr = it && pid[it.product_id]; if (!pr) continue;
+    const arrived = o.expected_date && dayDiff(o.expected_date, new Date()) <= 0;
+    orders.push({ no: o.po_id, poId: o.po_id, item: pr.id, qty: (o.purchase_order_items || []).reduce((s, i) => s + num(i.quantity), 0),
+      sup: (o.vendors && o.vendors.vendor_name) || pr.sup, step: o.status === 'received' ? 3 : arrived ? 3 : 1, done: o.status === 'received', more: (o.purchase_order_items || []).length - 1 });
+  }
+  const alerts = alertRows.map((a) => ({ id: a.alert_id, type: a.alert_type, pid: String(a.product_id), t: a.created_at })).filter((a) => pid[a.pid] || products.find((p) => p.id === a.pid));
+  const expired = { n: expRows.length, value: expRows.reduce((s, b) => s + num(b.current_quantity) * num(b.unit_cost), 0) };
+
   // products each supplier delivers (from their active batches)
   const items = {};
   for (const b of bat) { const pr = pid[b.product_id]; if (pr && b.vendor_id) (items[b.vendor_id] ||= new Set()).add(pr.id); }
@@ -118,10 +159,10 @@ export async function loadAll() {
     lead: v.lead_time_days == null ? 2 : v.lead_time_days, items: [...(items[v.vendor_id] || [])] }));
 
   return {
-    vendors: vendorsOut,
+    vendors: vendorsOut, requests, orders, alerts, expired,
     me: { id: user.id, companyId: meRow.company_id, name: meRow.full_name || 'You', role: meRow.role, company: (comp[0] && comp[0].company_name) || '' },
     products, use, series, moves, waste,
-    rules: { adminFinance: !!st.admin_can_see_finance },
+    rules: { adminFinance: !!st.admin_can_see_finance, limit: num(st.waste_approval_limit) || 50 },
     team: prof.map((p) => ({ id: p.user_id, name: p.full_name || p.email || 'Member', role: p.role, active: p.is_active !== false, email: p.email || '' })),
   };
 }
@@ -131,36 +172,47 @@ const rpc = async (fn, args) => { const { error, data } = await supabase.rpc(fn,
 
 export const usage = (p, q) => rpc('record_usage', { p_product: p.dbId, p_qty: q });
 
-export const receive = (p, q) =>
-  rpc('receive_stock', { p_product: p.dbId, p_vendor: p.supId, p_qty: q, p_unit_cost: p.cost || null, p_expiry: null, p_notes: null });
+// o = { vendorId, cost, expiry (YYYY-MM-DD), notes }
+export const receive = (p, q, o = {}) =>
+  rpc('receive_stock', { p_product: p.dbId, p_vendor: o.vendorId || p.supId || null, p_qty: q, p_unit_cost: o.cost != null ? o.cost : (p.cost || null),
+    p_expiry: o.expiry || null, p_notes: o.notes || null });
 
 // staff cannot add stock by themselves: they send a request that an owner/admin approves
-export async function requestStockIn(p, q) {
+export async function requestStockIn(p, q, o = {}) {
   const user = await currentUser();
   const { data: prof } = await supabase.from('profiles').select('company_id').eq('user_id', user.id).single();
   const { error } = await supabase.from('stock_in_requests').insert({
-    company_id: prof.company_id, submitted_by: user.id, product_id: p.dbId, vendor_id: p.supId, quantity: q,
-    unit_cost: p.cost || null, status: 'pending',
-  });
+    company_id: prof.company_id, submitted_by: user.id, product_id: p.dbId, vendor_id: o.vendorId || p.supId || null, quantity: q,
+    unit_cost: o.cost != null ? o.cost : (p.cost || null), expiry_date: o.expiry || null, notes: o.notes || null, status: 'pending' });
   if (error) throw error;
 }
+export const reviewStockIn = (id, ok, reason) => rpc('review_stock_in', { p_request: id, p_approve: ok, p_reason: reason || null });
 
-// waste is taken from the oldest-expiry batches first (expired batches included)
-export async function waste(p, q, reason = 'spoiled') {
-  const { data, error } = await supabase.from('batches').select('batch_id, current_quantity')
-    .eq('product_id', p.dbId).eq('status', 'active').is('deleted_at', null).gt('current_quantity', 0)
-    .order('expiry_date', { ascending: true, nullsFirst: false });
-  if (error) throw error;
-  let left = q;
-  for (const b of data) {
-    if (left <= 0) break;
-    const take = Math.min(num(b.current_quantity), left);
-    await rpc('record_waste', { p_batch: b.batch_id, p_qty: take, p_reason: reason, p_inspection: null });
-    left -= take;
-  }
-  if (left > 0.0001) throw new Error('Not enough stock to write off');
-}
+// waste is taken from the oldest-expiry batches first (expired batches included); staff over the limit are refused
+export const waste = (p, q, reason = 'spoiled') => rpc('record_waste_product', { p_product: p.dbId, p_qty: q, p_reason: reason });
+export const writeOffExpired = () => rpc('write_off_expired', {});
 
+export const requestWaste = (p, q, reason = 'spoiled') => rpc('request_approval', { p_kind: 'waste', p_payload: { product_id: p.dbId, qty: q, reason } });
+export const decideApproval = (id, ok, reason) => rpc('decide_approval', { p_approval: id, p_approve: ok, p_reason: reason || null });
+
+/* ---- purchase orders ---- */
+const poItems = (p, q) => [{ product_id: p.dbId, quantity: q, unit_cost: p.cost || null }];
+const needVendor = (p) => { if (!p.supId) throw new Error('Add a supplier first (People page).'); return p.supId; };
+export const requestPO = (p, q) => rpc('request_approval', { p_kind: 'purchase_order', p_payload: { vendor_id: needVendor(p), items: poItems(p, q), note: null } });
+export const createPO = (p, q) => rpc('create_purchase_order', { p_vendor: needVendor(p), p_items: poItems(p, q), p_note: null });
+export const receivePO = (id) => rpc('receive_purchase_order', { p_po: id });
+export const cancelPO = (id) => rpc('cancel_purchase_order', { p_po: id });
+
+/* ---- stock count and alerts ---- */
+export const adjust = (p, counted, reason) => rpc('adjust_stock', { p_product: p.dbId, p_counted: counted, p_reason: reason || 'stock count' });
+export const ackAlerts = (ids) => ids.length ? rpc('acknowledge_alerts', { p_ids: ids }) : Promise.resolve(0);
+
+/* ---- edit items and suppliers (owner/admin; RLS enforces it) ---- */
+export const updateProduct = (dbId, v) => supabase.from('products').update({
+  product_name: v.name, unit_of_measure: v.unit, min_stock_threshold: Number(v.reorder) || 0, shelf_life_days: Number(v.shelf) || null,
+  selling_price: Number(v.price) || null, capacity: Number(v.reorder) ? Number(v.reorder) * 4 : null }).eq('product_id', dbId).then(must);
+export const updateVendor = (id, v) => supabase.from('vendors').update({
+  vendor_name: v.name, contact_person_name: v.contact || null, phone_number: v.phone || null, lead_time_days: Number(v.lead) || 2 }).eq('vendor_id', id).then(must);
 /* ---- onboarding: register, create a company or join with an invite code ---- */
 export async function signUp(email, password) {
   const { data, error } = await supabase.auth.signUp({ email, password });
@@ -176,7 +228,7 @@ export const createInvite = (role) => rpc('create_invite', { p_role: role });
 export const setMember = (id, role, active) => rpc('set_member', { p_user: id, p_role: role, p_active: active });
 
 /* ---- suppliers and items (owner/admin only; RLS enforces it). Delete = soft delete, history stays ---- */
-const must = (r) => { if (r.error) throw r.error; return r.data; };
+function must(r) { if (r.error) throw r.error; return r.data; }
 export const addVendor = (v) => supabase.from('vendors').insert({
   company_id: CID, vendor_name: v.name, contact_person_name: v.contact || null, phone_number: v.phone || null,
   lead_time_days: Number(v.lead) || 2 }).then(must);

@@ -9,6 +9,9 @@ do $$ begin
   if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
 end $$;
 grant usage on schema public, auth to anon, authenticated;
+-- Supabase gives anon/authenticated execute on every new function by default; mimic it so tests catch exposed internals
+alter default privileges in schema public grant execute on functions to anon, authenticated;
+alter default privileges in schema public grant all on tables to anon, authenticated;
 
 create table companies(company_id bigint generated always as identity primary key, company_name text not null, registration_number text, created_at timestamptz default now(), deleted_at timestamptz);
 create table profiles(user_id uuid primary key references auth.users(id), company_id bigint references companies, full_name text, email text, role text, is_active boolean default true, created_at timestamptz default now());
