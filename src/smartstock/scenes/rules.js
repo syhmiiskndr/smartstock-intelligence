@@ -19,7 +19,7 @@ export default function rulesScene(api) {
     ${rule(L('Write-off limit','Had tulis-off'),L('Waste above this amount waits for approval.','Sisa melebihi jumlah ini menunggu kelulusan.'),`<div class="slide"><input type="range" id="limit" min="0" max="100" step="5" value="${R.limit}" aria-label="${L('Write-off limit','Had tulis-off')}"><b id="limit-v">RM ${R.limit}</b></div>`)}</div>
    <div class="lvl"><div class="lvl-h"><span class="pill">${L('Access','Akses')}</span><h3>${L('What admins can see','Apa yang admin boleh lihat')}</h3></div>
     ${rule(L('Admins can see costs and stock value','Admin boleh lihat kos dan nilai stok'),L('Off by default. Turn on for a trusted manager. Rules always stay owner-only.','Mati secara lalai. Hidupkan untuk pengurus dipercayai. Tetapan sentiasa untuk pemilik sahaja.'),sw('adminFinance',R.adminFinance))}</div>
-   <p class="demo-note">${L('Try it: set the limit to RM 5, then say "Waste 1 kg banana".','Cuba: tetapkan had RM 5, kemudian sebut "Buang 1 kilo pisang".')}</p>`;
+   ${S.me&&S.me.isDemo&&api.isOwner()?`<div class="lvl"><div class="lvl-h"><span class="pill">Demo</span><h3>${L('Demo company','Syarikat demo')}</h3></div>${rule(L('Reset demo data','Reset data demo'),L('Deletes everything in this company and loads the sample fruit shop again.','Padam semua dalam syarikat ini dan muat semula kedai buah contoh.'),`<button class="btn" data-pp="resetdemo">${L('Reset','Reset')}</button>`)}</div>`:''}`;
   }
 
   return { rules:rulesScene };

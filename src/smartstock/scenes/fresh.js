@@ -9,16 +9,16 @@ export default function freshScene(api) {
 
   function freshScene(){
    const F=S.fresh, r=F.res, c=2*Math.PI*30;
-   const wt=S.waste.reduce((a,w)=>a+w.amt,0), mx=Math.max(...S.waste.map(w=>w.amt));
+   const wt=S.waste.reduce((a,w)=>a+w.amt,0), mx=Math.max(1,...S.waste.map(w=>w.amt));
    const lbl=r?(r.bad?L('Spoiled','Rosak'):L('Fresh','Segar')):'';
    const res=r?`<div class="result"><svg width="76" height="76" viewBox="0 0 76 76" style="transform:rotate(-90deg)"><circle cx="38" cy="38" r="30" fill="none" stroke="var(--surface-2)" stroke-width="8"/><circle cx="38" cy="38" r="30" fill="none" stroke="${r.bad?'var(--bad)':'var(--ok)'}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(r.conf/100*c).toFixed(1)} ${c.toFixed(1)}"/></svg><div><b style="color:${r.bad?'var(--bad)':'var(--ok)'}">${lbl} ${r.conf}%</b><span class="say">${L('An indicator only, not a food-safety certification.','Indikator sahaja, bukan pengesahan keselamatan makanan.')}</span></div></div>
-    ${r.bad?`<div class="p-chips"><button class="btn primary" data-say="${L('Waste 2 kg banana','Buang 2 kilo pisang')}">${L('Log 2 kg as waste','Rekod sisa 2 kg')}</button></div>`:''}`:`<p class="meta" style="margin-top:14px">${L('Place the banana in the frame, then scan.','Letak pisang dalam bingkai, tekan imbas.')}${sayHint(L('Scan banana','Imbas pisang'))}</p>`;
+    ${r.bad?`<div class="p-chips"><button class="btn primary" data-say="${L('Waste 2 kg','Buang 2 kilo')}">${L('Log 2 kg as waste','Rekod sisa 2 kg')}</button></div>`:''}`:`<p class="meta" style="margin-top:14px">${L('Place the fruit in the frame, then scan.','Letak buah dalam bingkai, tekan imbas.')}${sayHint(L('Scan','Imbas'))}</p>`;
    return `${sh(L('Fresh','Segar'),L(`waste this week ${rm0(wt)}`,`sisa minggu ini ${rm0(wt)}`))}
    <div class="fresh"><div><div class="finder ${F.scanning?'scanning':''}"><i class="fc f1"></i><i class="fc f2"></i><i class="fc f3"></i><i class="fc f4"></i>${bananaSvg(r&&r.bad)}</div>
     <div class="row"><button class="btn primary big" data-scan="1" aria-label="${L('Scan','Imbas')}" ${F.scanning?'disabled':''}>${F.scanning?L('Scanning…','Mengimbas…'):L('Scan','Imbas')}</button></div></div>
     <div>${res}<h2 class="h2" style="margin-top:${r?22:6}px">${L('Waste by cost (RM)','Sisa ikut kos (RM)')}</h2>
     <div class="bubbles">${S.waste.map(w=>{const d=46+w.amt/mx*54;return `<span class="bub" style="width:${d}px;height:${d}px">${esc(w.n)}<br>${Math.round(w.amt)}</span>`}).join('')}</div></div></div>
-   <p class="demo-note">${L('Demo mode. Production model: Google Teachable Machine (banana, fresh or spoiled).','Mod demo. Model sebenar: Google Teachable Machine (pisang, segar atau rosak).')}</p>`;
+   <p class="demo-note">${L('Camera scan is coming: the freshness model (YOLOv4) is not connected yet. Waste below is real data.','Imbasan kamera akan datang: model kesegaran (YOLOv4) belum disambung. Sisa di bawah ialah data sebenar.')}</p>`;
   }
 
   return { fresh:freshScene };
