@@ -2,16 +2,6 @@
 export default function peopleScene(api) {
   const { L, pn, P, sh, S, esc, isMgr, isOwner, roleName } = api;
 
-  // Sample data for the demo account
-  function demoPeople(){
-   const team=[['Syahmi',L('Owner','Pemilik'),1],['Aina','Admin',1],['Syafiq',L('Staff','Staf'),1],['Siti',L('Staff','Staf'),0],['Hakim',L('Staff','Staf'),1]];
-   const sups=[['Segar Jaya',['Ayam','Telur','Bawang']],['Mill Sentosa',['Tepung','Beras','Minyak']],['Ladang Hijau',['Susu','Pisang']]];
-   const nm=n=>{const p=P.find(x=>x.name===n);return p?pn(p):n};
-   return `${sh(L('People','Orang'),L('3 online now','3 aktif sekarang'))}
-   <h2 class="h2">${L('Team','Pasukan')}</h2><div class="cluster">${team.map(([n,r,o])=>`<div class="av"><i class="${o?'on':''}">${n[0]}</i>${n}<small>${r}</small></div>`).join('')}</div>
-   <h2 class="h2">${L('Suppliers','Pembekal')}</h2><div class="cluster">${sups.map(([n,it])=>`<div class="sup"><b>${n}</b><div class="row" style="margin:0">${it.map(i=>`<span class="pill">${nm(i)}</span>`).join('')}</div></div>`).join('')}</div>`;
-  }
-
   // Real team and suppliers of the signed-in company
   function livePeople(){
    const mgr=isMgr(), own=isOwner(), team=S.team||[], vend=S.vendors||[], me=S.me||{};
@@ -35,5 +25,5 @@ export default function peopleScene(api) {
    <div class="cluster">${vend.length?vend.map(sup).join(''):`<p class="p-body">${L('No suppliers yet. Add the ones you buy from.','Belum ada pembekal. Tambah pembekal anda.')}</p>`}</div>`;
   }
 
-  return { people:()=>S.live?livePeople():demoPeople() };
+  return { people:livePeople };
 }

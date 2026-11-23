@@ -1,12 +1,11 @@
 /* Scene "analytics" – owner only (Intelligence layer). Interactive: metric tabs, 7/30/90 range,
    previous-period overlay, 7-day forecast, hover/touch crosshair, product focus, stockout runway,
    usage heatmap, supplier scorecard. Click and hover handlers live in engine.js (data-an-*).
-   All series are deterministic sample data; real ones come from the stock_movements table. */
+   Numbers come from the database (stock_transactions); the shape of the trend lines is computed here. */
 export default function analyticsScene(api) {
   const { S, L, P, pn, rm0, fq, U, esc, ic, sh, dateStr, costToday, costAvg, stockValue, clamp, eta } = api;
 
-  const LEAD={'Segar Jaya':1,'Mill Sentosa':3,'Ladang Hijau':2};
-  const ONTIME={'Segar Jaya':92,'Mill Sentosa':78,'Ladang Hijau':96};
+  const leadOf=n=>{const v=(S.vendors||[]).find(x=>x.name===n);return v?v.lead:2};
   const COL=['#0A84FF','#34C759','#FF9F0A','#AF52DE','#FF375F','#5AC8FA','#FFD60A','#8E8E93'];
   const rnd=seed=>{let s=seed;return()=>{s=(s*9301+49297)%233280;return s/233280}};
   const sum=a=>a.reduce((x,y)=>x+y,0);
@@ -78,7 +77,7 @@ export default function analyticsScene(api) {
   }
 
   function runway(){
-   const rows=P.map(p=>({p,d:p.qty/p.avg,lead:LEAD[p.sup]||2})).sort((a,b)=>a.d-b.d),MAXD=10;
+   const rows=P.map(p=>({p,d:p.qty/p.avg,lead:leadOf(p.sup)})).sort((a,b)=>a.d-b.d),MAXD=10;
    return `<div class="an-run">${rows.map(r=>{const w=clamp(r.d/MAXD*100,2,100),lp=clamp(r.lead/MAXD*100,0,100),tone=r.d<r.lead?'bad':r.d<r.lead+2?'warn':'ok';
     return `<div class="an-rrow" data-tip="${esc(pn(r.p))}: ${r.d.toFixed(1)} ${L('days left','hari lagi')} · ${r.p.sup} ${r.lead} ${L('day delivery','hari hantar')}"><span>${pn(r.p)}</span><i class="an-rbar"><u class="${tone}" style="width:${w}%"></u><s style="left:${lp}%"></s></i><b class="${tone}">${r.d.toFixed(1)}${L('d','h')}</b></div>`}).join('')}
    <p class="say" style="margin:10px 0 0">${L('The dark marker is the supplier delivery time. A bar that ends before it means stock runs out before the order can arrive.','Penanda gelap ialah masa penghantaran pembekal. Bar yang berakhir sebelum garisan bermakna stok habis sebelum order tiba.')}</p></div>`;
@@ -92,8 +91,9 @@ export default function analyticsScene(api) {
   }
 
   function suppliers(){
-   const names=Object.keys(LEAD),spend=Object.fromEntries(names.map(n=>[n,sum(P.filter(p=>p.sup===n).map(p=>S.use[p.id]*p.cost))])),tot=sum(Object.values(spend));
-   return `<div class="an-sup">${names.map(n=>{const ot=ONTIME[n],tone=ot>=90?'ok':ot>=80?'warn':'bad';return `<div class="an-srow"><b>${n}</b><span class="pill ${tone}">${ot}% ${L('on time','tepat masa')}</span><span class="pill">${LEAD[n]} ${L('day','hari')}${LEAD[n]>1&&S.lang!=='ms'?'s':''}</span><i class="an-sbar"><u style="width:${(spend[n]/tot*100).toFixed(0)}%"></u></i><small>${Math.round(spend[n]/tot*100)}% ${L('of spend','perbelanjaan')}</small></div>`}).join('')}</div>`;
+   const names=(S.vendors||[]).map(v=>v.name),spend=Object.fromEntries(names.map(n=>[n,sum(P.filter(p=>p.sup===n).map(p=>(S.use[p.id]||0)*p.cost))])),tot=sum(Object.values(spend))||1;
+   if(!names.length)return `<p class="meta">${L('Add suppliers to see them here.','Tambah pembekal untuk lihat di sini.')}</p>`;
+   return `<div class="an-sup">${names.map(n=>{const ld=leadOf(n);return `<div class="an-srow"><b>${esc(n)}</b><span class="pill">${ld} ${L('day','hari')}${ld>1&&S.lang!=='ms'?'s':''}</span><i class="an-sbar"><u style="width:${(spend[n]/tot*100).toFixed(0)}%"></u></i><small>${Math.round(spend[n]/tot*100)}% ${L('of spend','perbelanjaan')}</small></div>`}).join('')}</div>`;
   }
 
   function insights(m,n,cat,cur,prv){
@@ -101,7 +101,7 @@ export default function analyticsScene(api) {
    const dr=P.map(p=>({p,x:(S.use[p.id]-p.avg)*p.cost})).sort((a,b)=>b.x-a.x)[0];
    const good=bm.good==='down'?pct<=0:bm.good==='up'?pct>=0:null;
    out.push({t:good===false?'warn':'ok',h:L(`${L(bm.en,bm.ms)} is ${Math.abs(pct)}% ${pct>=0?'higher':'lower'} than the previous ${n} days`,`${bm.ms} ${Math.abs(pct)}% ${pct>=0?'lebih tinggi':'lebih rendah'} berbanding ${n} hari sebelum ini`),d:`${fmt(m,cs)} ${L('vs','berbanding')} ${fmt(m,ps)}.`+(m==='cost'&&dr.x>0?' '+L(`${pn(dr.p)} is the biggest driver today (+${rm0(dr.x)} over normal).`,`${pn(dr.p)} pemacu terbesar hari ini (+${rm0(dr.x)} melebihi biasa).`):'')});
-   const risk=P.map(p=>({p,d:p.qty/p.avg,lead:LEAD[p.sup]||2})).filter(x=>x.d<x.lead).sort((a,b)=>a.d-b.d)[0];
+   const risk=P.map(p=>({p,d:p.qty/p.avg,lead:leadOf(p.sup)})).filter(x=>x.d<x.lead).sort((a,b)=>a.d-b.d)[0];
    if(risk)out.push({t:'bad',h:L(`${pn(risk.p)} will run out before ${risk.p.sup} can deliver`,`${pn(risk.p)} akan habis sebelum ${risk.p.sup} sempat hantar`),d:L(`${risk.d.toFixed(1)} days of stock, delivery takes ${risk.lead}. Order now.`,`Stok ${risk.d.toFixed(1)} hari, penghantaran ${risk.lead} hari. Order sekarang.`),say:L(`Order ${P.length?20:0} kg ${risk.p.en.toLowerCase()}`,`Order 20 kilo ${risk.p.name.toLowerCase()}`)});
    const w=sum(S.waste.map(x=>x.amt)),tw=S.waste[0];
    out.push({t:'warn',h:L(`${rm0(w)} lost to waste this week`,`${rm0(w)} hilang kepada sisa minggu ini`),d:L(`${tw.n} is the largest item (${rm0(tw.amt)}). Earlier ordering of perishables would cut this.`,`${tw.n} paling besar (${rm0(tw.amt)}). Order barang cepat rosak lebih awal boleh kurangkan ini.`)});

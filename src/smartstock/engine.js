@@ -61,41 +61,27 @@ export function mountVoiceApp(host, opts = {}) {
   };
   const ic=(n,s=20)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[n]}"/></svg>`;
 
-  /* ---- data (contoh / illustrative) ---- */
-  const P=store.P||(store.P=[
-   {id:'ayam',name:'Ayam',en:'Chicken',unit:'kg',qty:4.2,cap:40,reorder:10,cost:9.5,exp:2,avg:9,sup:'Segar Jaya'},
-   {id:'tepung',name:'Tepung',en:'Flour',unit:'kg',qty:38,cap:50,reorder:15,cost:3.2,exp:120,avg:11,sup:'Mill Sentosa'},
-   {id:'minyak',name:'Minyak',en:'Oil',unit:'L',qty:14,cap:25,reorder:8,cost:7.5,exp:200,avg:6,sup:'Mill Sentosa'},
-   {id:'susu',name:'Susu',en:'Milk',unit:'L',qty:26,cap:40,reorder:10,cost:6.8,exp:3,avg:11,sup:'Ladang Hijau'},
-   {id:'telur',name:'Telur',en:'Eggs',unit:'biji',qty:240,cap:360,reorder:100,cost:.55,exp:12,avg:85,sup:'Segar Jaya'},
-   {id:'beras',name:'Beras',en:'Rice',unit:'kg',qty:70,cap:100,reorder:30,cost:3.8,exp:300,avg:15,sup:'Mill Sentosa'},
-   {id:'pisang',name:'Pisang',en:'Banana',unit:'kg',qty:14,cap:20,reorder:6,cost:4.5,exp:2,avg:6,sup:'Ladang Hijau'},
-   {id:'bawang',name:'Bawang',en:'Onion',unit:'kg',qty:9,cap:20,reorder:8,cost:5.2,exp:25,avg:4,sup:'Segar Jaya'}
-  ]);
+  /* ---- data: everything comes from Supabase (see data.js). Nothing is hardcoded here. ---- */
+  const P=store.P||(store.P=[]);
   const prod=id=>P.find(p=>p.id===id);
   const L=(en,ms)=>S.lang==='ms'?ms:en;
   const pn=p=>L(p.en,p.name);
   const U=u=>u==='biji'?L('pcs','biji'):u;
   const uw=u=>S.lang==='ms'?{kg:'kilo',L:'liter',biji:'biji'}[u]:{kg:'kg',L:'litres',biji:'pieces'}[u];
   const S=store.S||(store.S=(()=>{const S={
-   role:'admin',scene:'home',filter:'all',lang:'en',draft:null,pulse:null,demo:false,micBlocked:false,
-   use:{ayam:14,tepung:12,minyak:6,susu:12,telur:90,beras:15,pisang:6,bawang:4},
-   series:[352,388,371,405,366,389],
-   requests:[{id:1,kind:'writeoff',title:'',tkey:'wo',item:'susu',qty:3,amount:20.4,by:'Siti',reason:'',rkey:'exp',status:'pending'}],
-   waste:[{n:'Susu',amt:13.6},{n:'Pisang',amt:9},{n:'Telur',amt:5.5},{n:'Bawang',amt:4.2}],
-   tasks:[{id:'t1',en:'Check banana freshness',ms:'Semak kesegaran pisang',done:false,key:'fresh'},{id:'t2',en:'Receive 10 L milk',ms:'Terima 10 L susu',done:false,key:'receive:susu'},{id:'t3',en:'Log chicken usage',ms:'Rekod guna ayam',done:false,key:'usage:ayam'}],
-   audit:[],fresh:{res:null,scanning:false,n:0},rid:2
+   role:'staff',scene:'home',filter:'all',lang:'en',draft:null,pulse:null,micBlocked:false,
+   use:{},series:[],requests:[],waste:[],tasks:[],moves:[],
+   audit:[],fresh:{res:null,scanning:false,n:0},rid:1
   };
-  S.notes=[];S.range=7;S.orders=[];S.user=null;S.drawer=null;
+  S.notes=[];S.range=7;S.orders=[];S.user=null;S.drawer=null;S.live=false;S.me=null;S.team=null;S.vendors=null;S.expired=null;
   S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false};
-  S.moves=[{p:'ayam',type:'usage',q:3,t:'08:40',who:'Syafiq'},{p:'susu',type:'receive',q:20,t:'07:55',who:'Hakim'},{p:'ayam',type:'receive',q:20,t:'Yesterday',who:'Hakim'},{p:'telur',type:'usage',q:30,t:'09:10',who:'Syafiq'},{p:'ayam',type:'usage',q:4,t:'10:25',who:'Syafiq'}];return S})());
+  return S})());
   if(!S.an)S.an={metric:'cost',range:30,cmp:true,fc:true,cat:null};
-  if(!S.pl)S.pl={sel:'ayam',day:0,used:{},filter:null,playing:false,shown:0,toast:''};
-  /* ---- live data (Supabase). The demo account keeps the sample data above. ---- */
-  const SNAP=store.SNAP||(store.SNAP=JSON.stringify({P,use:S.use,series:S.series,requests:S.requests,waste:S.waste,tasks:S.tasks,moves:S.moves,orders:S.orders,fin:S.rules.adminFinance}));
-  function restoreSample(){
-   const o=JSON.parse(SNAP);P.length=0;P.push(...o.P);Object.assign(S,{use:o.use,series:o.series,requests:o.requests,waste:o.waste,tasks:o.tasks,moves:o.moves,orders:o.orders,live:false,me:null,team:null,vendors:null,expired:null,authMode:null});S.notes=S.notes.filter(n=>!n.db);
-   S.rules.adminFinance=o.fin;S.pl.sel=P[0].id;S.pl.used={};
+  if(!S.pl)S.pl={sel:null,day:0,used:{},filter:null,playing:false,shown:0,toast:''};
+  /* clear everything that belongs to the signed-in company (used on sign-out) */
+  function clearData(){
+   P.length=0;Object.assign(S,{use:{},series:[],requests:[],waste:[],tasks:[],moves:[],orders:[],live:false,me:null,team:null,vendors:null,expired:null,authMode:null});
+   S.notes=[];S.rules.adminFinance=false;S.pl.sel=null;S.pl.used={};
   }
   function alertNote(a){
    const p=prod(a.pid);if(!p)return null;const n=pn(p),t=new Date(a.t);
@@ -139,7 +125,12 @@ export function mountVoiceApp(host, opts = {}) {
   function ppAct(a){
    if(!S.live)return;
    const [k,arg]=a.split(':'),own=isOwner(),mgr=isMgr();
-   if(k==='invite'&&mgr){
+   if(k==='seed'&&mgr){
+    ppDone(DB.seedSample(),L('Sample data loaded','Data contoh dimuat'));
+   }else if(k==='resetdemo'&&own){
+    panel({state:L('Reset','Reset'),tone:'warn',title:L('Reset demo data?','Reset data demo?'),body:L('All stock, orders and history in this demo company are deleted and the sample data is loaded again.','Semua stok, order dan sejarah dalam syarikat demo ini dipadam dan data contoh dimuat semula.'),persist:true,
+     actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Reset','Reset'),kind:'ok',fn:()=>ppDone(DB.resetDemo(),L('Demo data reset','Data demo di-reset'))}]});
+   }else if(k==='invite'&&mgr){
     const mk=role=>DB.createInvite(role).then(code=>panel({state:L('Invite','Jemputan'),title:L('Invite code','Kod jemputan'),big:code,
       body:L('Share this code. It works once and expires in 7 days. They register on the login page, choose "Join with code" and enter it.','Kongsi kod ini. Ia sah sekali sahaja dan tamat dalam 7 hari. Mereka daftar di halaman log masuk, pilih "Sertai dengan kod" dan masukkan kod ini.'),
       persist:true,actions:[{label:L('Done','Selesai'),kind:'ok',fn:hidePanel}]})).catch(e=>notify('bad',L('Not created','Tidak dicipta'),String(e.message||e)));
@@ -219,7 +210,7 @@ export function mountVoiceApp(host, opts = {}) {
   }
   track(document,'click',e=>{const b=e.target.closest('[data-pp]');if(b)ppAct(b.dataset.pp)});
   const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
-  const costAvg=()=>S.series.reduce((a,b)=>a+b,0)/S.series.length;
+  const costAvg=()=>S.series.length?S.series.reduce((a,b)=>a+b,0)/S.series.length:0;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
   const pending=()=>S.requests.filter(r=>r.status==='pending');
   /* Roles: owner (Intelligence layer: finance, rules, everything), admin (Operational layer: runs the day, finance only if the owner allows), staff (records stock). Client-side only; real enforcement is Supabase RLS. */
@@ -228,20 +219,19 @@ export function mountVoiceApp(host, opts = {}) {
   const canFin=()=>S.role==='owner'||(S.role==='admin'&&!!S.rules.adminFinance);
   const ALLOW={owner:['home','analytics','stock','cost','fresh','ops','people','rules'],admin:['home','stock','fresh','ops','people'],staff:['home','stock','fresh']};
   const allowed=sc=>(ALLOW[S.role]||[]).includes(sc)||(sc==='cost'&&canFin());
-  const who=()=>S.live&&S.me?S.me.name:({owner:'Syahmi',admin:'Aina',staff:'Syafiq'})[S.role]||'Syafiq';
+  const who=()=>S.me?S.me.name:'';
   const roleName=r=>r==='owner'?L('Owner','Pemilik'):r==='admin'?'Admin':L('Staff','Staf');
   const eta=p=>{const h=p.qty/p.avg*24;return h<1?L('under 1 hour','kurang 1 jam'):h<36?Math.round(h)+L(' hours',' jam'):(h/24).toFixed(1)+L(' days',' hari')};
   const suggest=p=>Math.max(10,Math.round((p.avg*2.5-p.qty)/10)*10);
+  /* voice hints use the company's own first two items ({a}, {b}); generic wording when there are none yet */
   const EX={
-   ms:{admin:['Buka stok produk','Tunjuk stok rendah','Kenapa kos naik?','Bila ayam habis?','Order 20 kilo ayam','Lulus','Imbas pisang'],
-       staff:['Ayam dah guna 2 kilo','Terima 10 liter susu','Buang 1 kilo pisang','Imbas pisang','Buka stok']},
-   en:{admin:['Open product stock','Show low stock','Why did costs rise?','When will chicken run out?','Order 20 kg chicken','Approve','Scan banana'],
-       staff:['We used 2 kg chicken','Receive 10 litres milk','Waste 1 kg banana','Scan banana','Open stock']}
+   ms:{admin:['Buka stok produk','Tunjuk stok rendah','Kenapa kos naik?','Bila {a} habis?','Order 20 kilo {a}','Lulus'],
+       staff:['{a} dah guna 2 kilo','Terima 10 kilo {b}','Buang 1 kilo {b}','Buka stok']},
+   en:{admin:['Open product stock','Show low stock','Why did costs rise?','When will {a} run out?','Order 20 kg {a}','Approve'],
+       staff:['We used 2 kg {a}','Receive 10 kg {b}','Waste 1 kg {b}','Open stock']}
   };
   EX.ms.owner=EX.ms.admin;EX.en.owner=EX.en.admin;
-  // live accounts: swap the sample product names in the hints for the company's own items
-  const liveHint=x=>{if(!S.live||!P.length)return x;const a=pn(P[0]).toLowerCase(),b=pn(P[Math.min(1,P.length-1)]).toLowerCase();
-   return x.replace(/chicken|ayam/gi,a).replace(/banana|pisang|milk|susu/gi,b)};
+  const liveHint=x=>{const a=P[0]?pn(P[0]).toLowerCase():L('stock','stok'),b=P[1]?pn(P[1]).toLowerCase():a;return x.replace(/\{a\}/g,a).replace(/\{b\}/g,b)};
   const examples=()=>EX[S.lang][S.role].filter(x=>canFin()||!/kos|cost/i.test(x)).map(liveHint);
 
   /* ---- scenes ---- */
@@ -253,29 +243,26 @@ export function mountVoiceApp(host, opts = {}) {
   const reqReason=r=>{const p=prod(r.item);return r.rkey==='in'?L('Staff delivery','Penghantaran staf'):r.rkey==='exp'?L('Expired','Luput'):r.rkey==='rep'?L('Reported spoiled','Dilapor rosak'):L('Runs out in ','Habis dalam ')+eta(p)};
   const byName=b=>b==='staff'?L('Staff','Staf'):b;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   const SCENES={};const missingScene=()=>`<div class="sh"><h1 class="h1">${L("Not available yet","Belum tersedia")}</h1><p class="meta">${L("This page has not been merged into the project yet.","Page ini belum digabungkan ke dalam projek.")}</p></div>`;
 
   /* ---- shell: render, panel, dock ---- */
   const stage=$('#stage'), panelEl=$('#panel'), cmdEl=$('#cmd');
   let acts=[], panelTimer, hintTimer, hintI=0, typing=null;
 
+  /* a brand-new company has no data yet: show a short setup checklist instead of empty charts */
+  const EMPTY_OK=['home','analytics','stock','cost','fresh'];
+  function emptyScene(){
+   const mgr=isMgr(),own=isOwner();
+   const st=(n,t,d,act)=>`<div class="rcard"><b>${n}. ${t}</b><p class="meta">${d}</p>${act&&mgr?`<div class="row"><button class="btn primary" data-pp="${act}">${t}</button></div>`:''}</div>`;
+   return `${sh(L('Welcome','Selamat datang'),S.me&&S.me.company?esc(S.me.company):'')}
+    <p class="meta">${mgr?L('Your company has no items yet. Set it up in a few steps.','Syarikat anda belum ada item. Sediakan dalam beberapa langkah.'):L('No items yet. Ask your admin to set up the stock list.','Belum ada item. Minta admin sediakan senarai stok.')}</p>
+    ${mgr?st(1,L('Add a supplier','Tambah pembekal'),L('Who you buy from, and how many days delivery takes.','Daripada siapa anda beli, dan berapa hari penghantaran.'),'addsup')
+     +st(2,L('Add an item','Tambah item'),L('Name, unit, reorder level and shelf life.','Nama, unit, paras susun semula dan hayat simpanan.'),'addprod')
+     +st(3,L('Invite your team','Jemput pasukan'),L('Create a code for admin or staff to join.','Cipta kod untuk admin atau staf menyertai.'),'invite')
+     +(own?`<div class="rcard"><b>${L('Just exploring?','Sekadar mencuba?')}</b><p class="meta">${L('Load a sample fruit shop (10 items, 3 suppliers, 14 days of usage). You can reset it later in Rules.','Muat kedai buah contoh (10 item, 3 pembekal, 14 hari penggunaan). Boleh reset kemudian di Rules.')}</p><div class="row"><button class="btn" data-pp="seed">${L('Load sample data','Muat data contoh')}</button></div></div>`:''):''}`;
+  }
   function render(bloom){
-   stage.innerHTML=(SCENES[S.scene]||missingScene)();
+   stage.innerHTML=(S.live&&!P.length&&EMPTY_OK.includes(S.scene)?emptyScene:SCENES[S.scene]||missingScene)();
    if(bloom){stage.classList.remove('bloom');void stage.offsetWidth;stage.classList.add('bloom');stage.scrollTop=0}
    if(S.scene==='ops')bindOps();
    if(S.scene==='home'&&S.role!=='staff'){if(bloom)S.pl.shown=0;plCount()}
@@ -322,7 +309,7 @@ export function mountVoiceApp(host, opts = {}) {
     if(PL.playing){PL.playing=false}
     else{PL.playing=true;if(PL.day>=7)PL.day=0;plTm=setInterval(()=>{const nd=Math.round((S.pl.day+.1)*10)/10;if(nd>7||!stage.querySelector('.pl')){clearInterval(plTm);S.pl.playing=false}else S.pl.day=nd;plPatch()},110)}
    }
-   else if(k==='reset'){clearInterval(plTm);Object.assign(PL,{day:0,used:{},filter:null,playing:false,sel:'ayam',toast:''})}
+   else if(k==='reset'){clearInterval(plTm);Object.assign(PL,{day:0,used:{},filter:null,playing:false,sel:P[0]?P[0].id:null,toast:''})}
    plPatch();
   }
   function go(scene){
@@ -422,11 +409,10 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* ---- language: parse Malay + English, always both ---- */
   const norm=t=>t.toLowerCase().replace(/[.,!?'"“”]/g,' ').replace(/\s+/g,' ').trim();
-  const SYN=[['ayam','ayam'],['chicken','ayam'],['tepung','tepung'],['flour','tepung'],['susu','susu'],['milk','susu'],['telur','telur'],['eggs','telur'],['egg','telur'],['beras','beras'],['rice','beras'],['minyak','minyak'],['oil','minyak'],['pisang','pisang'],['banana','pisang'],['bawang','bawang'],['onions','bawang'],['onion','bawang']];
   const FSYN=[['apple','epal'],['orange','oren'],['banana','pisang'],['watermelon','tembikai'],['papaya','betik'],['mango','mangga'],['grapes','anggur'],['grape','anggur'],['strawberry','strawberi'],['strawberries','strawberi'],['pineapple','nanas'],['guava','jambu']];
   const findItem=t=>{
-   for(const [w,id] of SYN)if(prod(id)&&new RegExp('\\b'+w+'\\b').test(t))return id;
    for(const [w,key] of FSYN)if(new RegExp('\\b'+w+'\\b').test(t)){const p=P.find(x=>norm(x.name).split(' ').includes(key));if(p)return p.id}
+   for(const p of P){const e=p.en?norm(p.en).split(' ')[0]:'';if(e.length>2&&new RegExp('\\b'+e+'\\b').test(t))return p.id}
    for(const p of P){const w=norm(p.name).split(' ')[0];if(w.length>2&&new RegExp('\\b'+w+'\\b').test(t))return p.id}
    return null};
   const NW={setengah:.5,separuh:.5,half:.5,satu:1,one:1,dua:2,two:2,tiga:3,three:3,empat:4,four:4,lima:5,five:5,enam:6,six:6,tujuh:7,seven:7,lapan:8,eight:8,sembilan:9,nine:9,sepuluh:10,ten:10,'dua puluh':20,twenty:20,'tiga puluh':30,thirty:30,'lima puluh':50,fifty:50};
@@ -476,7 +462,7 @@ export function mountVoiceApp(host, opts = {}) {
    }
    if(/\b(kenapa|mengapa|why)\b/.test(t)&&/\b(kos|cost|costs)\b/.test(t)){
     log(text,L('Cost question','Soalan kos'),L('Answered','Dijawab'));if(!canFin())return deny();
-    const dr=P.map(p=>({p,x:(S.use[p.id]-p.avg)*p.cost})).sort((a,b)=>b.x-a.x)[0], pct=Math.round((costToday()/costAvg()-1)*100);
+    const dr=P.map(p=>({p,x:((S.use[p.id]||0)-p.avg)*p.cost})).sort((a,b)=>b.x-a.x)[0], pct=costAvg()>0?Math.round((costToday()/costAvg()-1)*100):0;
     return panel({state:L('Answer','Jawapan'),said:text,title:L(`${pn(dr.p)} pushes cost up the most`,`${pn(dr.p)} paling menaikkan kos`),big:'+'+rm0(dr.x),facts:[[L('used today','guna hari ini'),`${fq(S.use[dr.p.id])} ${U(dr.p.unit)}`],[L('usual','biasa'),`${dr.p.avg} ${U(dr.p.unit)}`],[L('total cost','jumlah kos'),`${pct>=0?'+':''}${pct}%`]],chips:[{label:L('Open cost','Buka kos'),say:L('Open cost','Buka kos')}],ttl:14000});
    }
    if(item&&!V.usage.test(t)&&/\b(bila|when|habis|run out|runs out|lama|how long)\b/.test(t)){
@@ -583,12 +569,9 @@ export function mountVoiceApp(host, opts = {}) {
    el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
   }
 
-  /* freshness scan (demo) */
+  /* freshness scan (placeholder until the YOLOv4 service is connected) */
   function scan(){
-   if(S.scene!=='fresh'||S.fresh.scanning)return;
-   S.fresh.scanning=true;S.fresh.res=null;refresh();
-   setTimeout(()=>{const bad=S.fresh.n%2===1;S.fresh.n++;S.fresh.res={bad,conf:bad?88:94};S.fresh.scanning=false;tick('fresh');
-    log(L('(scan)','(imbas)'),L('Freshness classification','Klasifikasi segar'),bad?L('Spoiled 88%','Rosak 88%'):L('Fresh 94%','Segar 94%'));refresh()},1600);
+   panel({state:L('Coming soon','Akan datang'),tone:'warn',title:L('Freshness model not connected yet.','Model kesegaran belum disambung.'),body:L('The YOLOv4 service will be plugged in here.','Perkhidmatan YOLOv4 akan disambung di sini.')});
   }
 
   /* detail sheet for a jar */
@@ -601,10 +584,9 @@ export function mountVoiceApp(host, opts = {}) {
    panel({state:L('Daily briefing','Ringkasan harian'),title:txt,ttl:12000});
   }
 
-  /* ---- roles, language, demo, events ---- */
+  /* ---- language, events ---- */
   function applyStatic(){
    document.documentElement.lang=S.lang==='ms'?'ms':'en';
-   $('.seg [data-role=staff]').textContent=L('Staff','Staf');
    $('#t-log').innerHTML=ic('clock',16)+`<span class="lbl">${L('Trail','Jejak')}</span>`;
    $('#t-log').setAttribute('aria-label',L('Command trail','Jejak arahan'));
    $('#t-lang').innerHTML=ic('mic',16)+`<span>${S.lang==='ms'?'BM':'EN'}</span>`;
@@ -614,31 +596,11 @@ export function mountVoiceApp(host, opts = {}) {
    $('#cmd-input').placeholder=L('e.g. open product stock','cth: buka stok produk');
    $('#cmd-input').setAttribute('aria-label',L('Command','Arahan'));
    $('#cmd button[type=submit]').textContent=L('Send','Hantar');
-   demoBtn();
   }
   function setLang(l){
    if(S.lang===l)return;S.lang=l;S.draft=null;try{rec&&rec.abort()}catch(e){}
    applyStatic();hidePanel();closeCmd();render(false);startHints();
   }
-  function setRole(r){
-   if(!S.demoMode||S.role===r)return;S.role=r;S.draft=null;S.filter='all';S.scene='home';
-   $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.role===r));
-   closeMenu();closeCmd();render(true);startHints();applyChrome();
-   panel({state:r==='owner'?L('Owner view','Paparan pemilik'):r==='admin'?L('Admin view','Paparan admin'):L('Staff view','Paparan staf'),title:r==='owner'?L('Action Centre: health, money and what needs a decision.','Pusat Tindakan: kesihatan, wang dan keputusan.'):r==='admin'?L('Operations board: tasks, approvals and deliveries.','Papan operasi: tugas, kelulusan dan penghantaran.'):L('A simple screen. Just say what you did.','Skrin ringkas. Cakap apa yang anda buat.'),ttl:2600});
-  }
-  const DEMO=[['owner','Open product stock','Buka stok produk'],[0,'Show low stock','Tunjuk stok rendah'],['staff','We used 2 kg chicken','Ayam dah guna 2 kilo'],[0,'Confirm','Betul'],['owner','When will chicken run out?','Bila ayam habis?'],[0,'Order 20 kg chicken','Order 20 kilo ayam'],[0,'Confirm','Betul'],[0,'Approve','Lulus'],[0,'Why did costs rise?','Kenapa kos naik?'],[0,'Scan banana','Imbas pisang']];
-  async function runDemo(){
-   if(S.demo){S.demo=false;demoBtn();return}
-   S.demo=true;demoBtn();
-   for(const [r,en,ms] of DEMO){
-    if(!S.demo)break;
-    if(r){setRole(r);await sleep(1200)}
-    await speakSim(S.lang==='ms'?ms:en);await sleep(r==='staff'||en==='Confirm'?1700:2600);
-   }
-   S.demo=false;demoBtn();
-  }
-  function demoBtn(){const b=$('#t-demo');b.setAttribute('aria-pressed',S.demo);b.innerHTML=`${ic(S.demo?'stop':'play',16)}<span class="lbl">${S.demo?L('Stop demo','Henti demo'):L('1-minute demo','Demo 1 minit')}</span>`}
-
   track(document,'click',e=>{
    const t=e.target;let b;
    if(b=t.closest('#stage [data-say]'))return speakSim(b.dataset.say);
@@ -653,9 +615,7 @@ export function mountVoiceApp(host, opts = {}) {
   });
   $('#brand').onclick=()=>go('home');
   $('#t-log').onclick=showAudit;
-  $('#t-demo').onclick=runDemo;
   $('#t-lang').onclick=()=>setLang(S.lang==='ms'?'en':'ms');
-  $$('.seg button').forEach(b=>b.onclick=()=>setRole(b.dataset.role));
   $('#b-menu').innerHTML=ic('grid',22);$('#b-type').innerHTML=ic('kbd',22);$('#orb').querySelector('.mic').innerHTML=ic('mic',30);
   track(document,'keydown',e=>{
    if(e.key==='Escape'){closeMenu();closeCmd();hidePanel()}
@@ -777,22 +737,16 @@ export function mountVoiceApp(host, opts = {}) {
 
   function enter(role){
    S.role=role;S.scene='home';if(opts.onNavigate)opts.onNavigate('home');S.filter='all';S.draft=null;S.user=role;$('#login').hidden=true;
-   $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.role===role));
    render(true);startHints();applyChrome();clearLive();
-   if(S.live){/* real accounts get real alerts from the database, no scripted demo notifications */}
-   else if(role!=='staff'){
-    later(()=>{if(S.rules.expAlert)notify('warn',L('Milk batch B-MI-204 expires in 3 days','Kelompok susu B-MI-204 luput dalam 3 hari'),L('Use it first, or schedule a promotion.','Guna dahulu, atau jalankan promosi.'))},4500);
-    later(()=>{if(S.rules.anomaly)notify('warn',L('Unusual chicken usage','Penggunaan ayam luar biasa'),L('Used 56% above the normal daily rate.','Digunakan 56% melebihi kadar harian biasa.'))},10000);
-   }else later(()=>notify('ok',L('New task assigned','Tugas baru diberikan'),L('Check banana freshness before 10 am.','Semak kesegaran pisang sebelum 10 pagi.')),5000);
   }
   track(document,'click',e=>{
    let b;
    if(b=e.target.closest('[data-enter]'))enter(b.dataset.enter);
    if(b=e.target.closest('[data-llang]'))setLang(S.lang==='ms'?'en':'ms');
   });
-  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.demo=false;setDemoMode(false);S.user=null;if(S.live){DB.signOut();restoreSample()}demoBtn();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
+  $('#t-user').onclick=()=>{clearLive();closeDrawer();hidePanel();closeCmd();closeMenu();S.user=null;DB.signOut();clearData();renderLogin();$('#login').hidden=false;if(opts.onNavigate)opts.onNavigate('login')};
   function applyChrome(){
-   $('#biz').textContent=S.live&&S.me&&S.me.company?S.me.company:L('Dapur Syahmi · Melaka outlet','Dapur Syahmi · Cawangan Melaka');
+   $('#biz').textContent=S.me&&S.me.company?S.me.company:'SmartStock';
    $('#t-user').textContent=who()[0];$('#t-user').title=who()+' · '+roleName(S.role);
    $('#t-user').style.background=S.role==='owner'?'var(--accent)':S.role==='admin'?'#AF52DE':'var(--ok)';
    updateBell();
@@ -897,26 +851,20 @@ export function mountVoiceApp(host, opts = {}) {
   track(document,'pointerout',e=>{const el=e.target.closest&&e.target.closest('.rg');if(el&&!el.contains(e.relatedTarget)){el.style.setProperty('--rx','0deg');el.style.setProperty('--ry','0deg')}});
   track(document,'click',e=>{if(e.target.closest('button')){try{navigator.vibrate&&navigator.vibrate(6)}catch(x){}}},true);
 
-  /* sign-in: one lock-screen style form for everyone. The role comes from the account that signs in.
-   * Demo accounts (client-side only, sample data): admin / admin  and  staff / admin */
-  const ACCOUNTS=[{role:'owner',user:'owner',pass:'owner'},{role:'admin',user:'admin',pass:'admin'},{role:'staff',user:'staff',pass:'staff'},{role:'owner',user:'demo',pass:'demo',demo:true}];
-  /* Real accounts have one fixed role. Only the demo account (presentation mode) gets the Admin/Staff switch and the 1-minute demo. */
-  const setDemoMode=on=>{S.demoMode=!!on;root.classList.toggle('demo-mode',!!on);if(on)requestAnimationFrame(()=>syncSegs())};
+  /* sign-in: one lock-screen style form. The role comes from the account that signs in (Supabase Auth). */
   function renderLogin(){
    if(S.authMode==='register'||S.authMode==='setup')return renderAuthAlt();
    const keep=$('#lg-user')?{u:$('#lg-user').value,p:$('#lg-pass').value,f:document.activeElement&&document.activeElement.id}:null;
    $('#login').innerHTML=`<form class="lg-card" id="lg-form" novalidate>
      <i class="lg-av"><svg width="44" height="44" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="#0A84FF" stroke-width="3" stroke-dasharray="52 100" stroke-linecap="round" transform="rotate(-90 14 14)"/><circle cx="14" cy="14" r="6" fill="none" stroke="#34C759" stroke-width="3" stroke-dasharray="26 100" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg></i>
      <h2 class="lg-title">${L('Sign in to SmartStock','Log masuk ke SmartStock')}</h2>
-     <p class="lg-sub">${DB.dataReady?'SmartStock Intelligence':'Dapur Syahmi · '+L('Melaka outlet','Cawangan Melaka')}</p>
+     <p class="lg-sub">SmartStock Intelligence</p>
      <label class="lg-f"><span>${L('Username or email','Nama pengguna atau e-mel')}</span><input id="lg-user" name="username" autocomplete="username" enterkeyhint="next" autocapitalize="none" spellcheck="false"></label>
      <label class="lg-f"><span>${L('Password','Kata laluan')}</span><div class="lg-pw"><input id="lg-pass" name="password" type="password" autocomplete="current-password" enterkeyhint="go"><button type="button" class="lg-eye" data-lpw="1" aria-pressed="false">${L('Show','Tunjuk')}</button></div></label>
      <p class="lg-err" id="lg-err" role="alert"></p>
      <button class="lg-go" type="submit">${L('Sign in','Log masuk')}</button>
-     <p class="lg-hint">${DB.dataReady?'<b>owner</b> / <b>owner123</b> · <b>admin</b> / <b>admin123</b> · <b>staff</b> / <b>staff123</b>':'<b>owner</b> / <b>owner</b> · <b>admin</b> / <b>admin</b> · <b>staff</b> / <b>staff</b>'}</p>
-     ${DB.dataReady?`<button class="lg-link" type="button" data-auth="register">${L('New company? Create an account','Syarikat baru? Cipta akaun')}</button>`:''}
+     ${DB.dataReady?`<button class="lg-link" type="button" data-auth="register">${L('New company? Create an account','Syarikat baru? Cipta akaun')}</button>`:`<p class="lg-err" role="alert">${L('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY, then rebuild.','Supabase belum dikonfigurasi. Tetapkan VITE_SUPABASE_URL dan VITE_SUPABASE_PUBLISHABLE_KEY, kemudian bina semula.')}</p>`}
      ${S.authMsg?`<p class="lg-hint" role="status">${esc(S.authMsg)}</p>`:''}
-     <p class="lg-hint lg-hint2"><b>demo</b> / <b>demo</b> · ${L('presentation mode, switch between Owner, Admin and Staff','mod pembentangan, tukar antara Pemilik, Admin dan Staf')}</p>
     </form>
     <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
    if(keep){$('#lg-user').value=keep.u;$('#lg-pass').value=keep.p}
@@ -934,12 +882,10 @@ export function mountVoiceApp(host, opts = {}) {
    const u=$('#lg-user').value.trim().toLowerCase(),p=$('#lg-pass').value,err=$('#lg-err');
    const fail=msg=>{err.textContent=msg;form.classList.remove('shake');void form.offsetWidth;form.classList.add('shake');const i=$('#lg-pass');i.value='';i.focus()};
    if(!u||!p){fail(L('Enter your username and password.','Masukkan nama pengguna dan kata laluan.'));return}
-   const acc=ACCOUNTS.find(a=>a.user===u&&a.pass===p&&(a.demo||!DB.dataReady));
-   if(!acc&&!DB.dataReady){fail(L('Wrong username or password.','Nama pengguna atau kata laluan salah.'));return}
+   if(!DB.dataReady){fail(L('Supabase is not configured.','Supabase belum dikonfigurasi.'));return}
    err.textContent='';
    const btn=form.querySelector('.lg-go');btn.disabled=true;btn.textContent=L('Signing in…','Log masuk…');
-   if(acc){setTimeout(()=>{restoreSample();setDemoMode(acc.demo);enter(acc.role);setTimeout(renderLogin,1000)},350);return}
-   DB.signIn(u,p).then(()=>DB.loadAll()).then(d=>{applyData(d);setDemoMode(false);enter(d.me.role);setTimeout(renderLogin,1000)})
+   DB.signIn(u,p).then(()=>DB.loadAll()).then(d=>{applyData(d);enter(d.me.role);setTimeout(renderLogin,1000)})
     .catch(e=>{if(e&&e.code==='NO_COMPANY'){S.authMode='setup';S.setupTab='create';renderLogin();return}
      DB.signOut();const m=String(e&&e.message||'');btn.disabled=false;btn.textContent=L('Sign in','Log masuk');
      fail(/no company/i.test(m)?L('This account has no company yet.','Akaun ini belum ada syarikat.'):/invalid login/i.test(m)?L('Wrong username or password.','Nama pengguna atau kata laluan salah.'):L('Could not sign in: ','Gagal log masuk: ')+m)});
@@ -962,7 +908,7 @@ export function mountVoiceApp(host, opts = {}) {
     <div class="lg-foot"><button class="tbtn" data-llang="1">${ic('mic',16)}<span>${S.lang==='ms'?'Bahasa Melayu':'English'}</span></button></div>`;
    setTimeout(()=>{const i=$('#login input');if(i)i.focus({preventScroll:true})},60);
   }
-  const finishLogin=()=>DB.loadAll().then(d=>{applyData(d);S.authMode=null;S.authMsg='';setDemoMode(false);enter(d.me.role);setTimeout(renderLogin,1000)});
+  const finishLogin=()=>DB.loadAll().then(d=>{applyData(d);S.authMode=null;S.authMsg='';enter(d.me.role);setTimeout(renderLogin,1000)});
   track(document,'click',e=>{
    let b;
    if(b=e.target.closest('#login [data-auth]')){const a=b.dataset.auth;S.authMsg='';
@@ -1046,9 +992,8 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* ---- boot ---- */
   if(opts.scene&&opts.scene!=='login')S.scene=opts.scene;
-  S.demo=false;S.demoMode=false;
   renderLogin();$('#login').hidden=!!S.user;applyStatic();
-  if(DB.dataReady&&!S.user)DB.currentUser().then(u=>u&&!S.user?DB.loadAll().then(d=>{if(S.user)return;applyData(d);setDemoMode(false);enter(d.me.role)}):0).catch(e=>{if(e&&e.code==='NO_COMPANY'&&!S.user){S.authMode='setup';S.setupTab='create';renderLogin()}});
+  if(DB.dataReady&&!S.user)DB.currentUser().then(u=>u&&!S.user?DB.loadAll().then(d=>{if(S.user)return;applyData(d);enter(d.me.role)}):0).catch(e=>{if(e&&e.code==='NO_COMPANY'&&!S.user){S.authMode='setup';S.setupTab='create';renderLogin()}});
 
   render(true);startHints();syncSegs();
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(syncSegs);

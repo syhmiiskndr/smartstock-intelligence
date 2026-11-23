@@ -47,7 +47,7 @@ export async function loadAll() {
   const todayISO = new Date().toISOString().slice(0, 10);
   const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ] = await Promise.all([
     supabase.from('profiles').select('user_id, full_name, role, company_id, is_active, email'),
-    supabase.from('companies').select('company_id, company_name'),
+    supabase.from('companies').select('*'),
     supabase.from('product_overview').select('*').order('product_name'),
     supabase.from('batches').select('product_id, vendor_id, unit_cost, current_quantity, received_date, vendors(vendor_name)')
       .eq('status', 'active').is('deleted_at', null).order('received_date', { ascending: false }),
@@ -160,7 +160,7 @@ export async function loadAll() {
 
   return {
     vendors: vendorsOut, requests, orders, alerts, expired,
-    me: { id: user.id, companyId: meRow.company_id, name: meRow.full_name || 'You', role: meRow.role, company: (comp[0] && comp[0].company_name) || '' },
+    me: { id: user.id, companyId: meRow.company_id, name: meRow.full_name || 'You', role: meRow.role, company: (comp[0] && comp[0].company_name) || '', isDemo: !!(comp[0] && comp[0].is_demo) },
     products, use, series, moves, waste,
     rules: { adminFinance: !!st.admin_can_see_finance, limit: num(st.waste_approval_limit) || 50 },
     team: prof.map((p) => ({ id: p.user_id, name: p.full_name || p.email || 'Member', role: p.role, active: p.is_active !== false, email: p.email || '' })),
@@ -170,6 +170,9 @@ export async function loadAll() {
 /* ---- writes: all go through database functions that check role and stock ---- */
 const rpc = async (fn, args) => { const { error, data } = await supabase.rpc(fn, args); if (error) throw error; return data; };
 
+/* sample data: load the fruit-shop sample into an empty company, or wipe and reload it on a demo company */
+export const seedSample = () => rpc('seed_demo_fruit_shop');
+export const resetDemo = () => rpc('reset_demo');
 export const usage = (p, q) => rpc('record_usage', { p_product: p.dbId, p_qty: q });
 
 // o = { vendorId, cost, expiry (YYYY-MM-DD), notes }

@@ -20,7 +20,7 @@ export default function homeScene(api) {
      Stock room as live tiles, a health score with a "if you act" gain, a story per item,
      a time slider that shows what happens next, and real actions (orders go to Order tracking).
      Backend later: stock_movements, suppliers.lead_time_days, purchase_orders. */
-  const LEAD={'Segar Jaya':1,'Mill Sentosa':3,'Ladang Hijau':2};
+  const leadOf=n=>{const v=(S.vendors||[]).find(x=>x.name===n);return v?v.lead:2};
   const byId=id=>P.find(p=>p.id===id);
   const sum=a=>a.reduce((x,y)=>x+y,0);
   const mvVerb=t=>t==='usage'?L('used','guna'):t==='receive'?L('received','terima'):t==='waste'?L('wasted','rosak'):L('ordered','order');
@@ -31,7 +31,7 @@ export default function homeScene(api) {
 
   /* one product at day d: stock falls with use, open orders arrive after the supplier lead time */
   function rowFor(p,d,ord,used){
-   const lead=LEAD[p.sup]||2,handled=!!used[p.id];
+   const lead=leadOf(p.sup),handled=!!used[p.id];
    let q;if(!ord||d<=lead)q=Math.max(0,p.qty-p.avg*d);else q=Math.min(p.cap,Math.max(0,p.qty-p.avg*lead)+ord-p.avg*(d-lead));
    const days0=p.qty/p.avg,daysNow=q/p.avg,expLeft=p.exp-d;
    const out=q<=.05,low=!out&&q<=p.reorder,soon=!out&&!low&&daysNow<lead+.5;
@@ -54,7 +54,7 @@ export default function homeScene(api) {
    const dayLabel=d===0?L('Now','Sekarang'):d<1?L('In ','Dalam ')+Math.round(d*24)+L(' hours',' jam'):L('In ','Dalam ')+nf(d)+L(' days',' hari');
    const lowN=rows.filter(r=>r.low||r.out).length,freshN=rows.filter(r=>!(r.expiring||r.expired)).length;
    const stockPct=Math.round((rows.length-lowN)/rows.length*100),freshPct=Math.round(freshN/rows.length*100);
-   const doneT=S.tasks.filter(t=>t.done).length,pct=Math.round((costToday()/costAvg()-1)*100);
+   const doneT=S.tasks.filter(t=>t.done).length,pct=costAvg()>0?Math.round((costToday()/costAvg()-1)*100):0;
    const pillar=(k,name,val,col,pick)=>`<${pick?'button':'div'} class="pl-pillar ${PL.filter===k?'on':''}" style="--pc:${col}" ${pick?`data-pl="filter" data-id="${k}" aria-pressed="${PL.filter===k}"`:''}><span>${name}</span><b>${val}%</b><i><u style="width:${val}%"></u></i></${pick?'button':'div'}>`;
    const pillars=pillar('stock',L('Stock levels','Paras stok'),stockPct,'var(--r-stock)',1)+pillar('fresh',L('Freshness','Kesegaran'),freshPct,'var(--r-fresh)',1)+(own?pillar('cost',L('Cost control (see Analytics)','Kawalan kos (lihat Analitik)'),clamp(100-Math.max(0,pct),0,100),'var(--r-cover)',0):pillar('tasks',L(`Team tasks (${doneT} of ${S.tasks.length} done)`,`Tugas pasukan (${doneT} daripada ${S.tasks.length} siap)`),Math.round(doneT/S.tasks.length*100),'#AF52DE',0));
    const tiles=rows.map(r=>{const p=r.p,fill=clamp(r.q/p.cap*100,3,100),bad=r.out||r.low,warn=!bad&&(r.soon||r.expiring||r.expired),k=bad?'bad':warn?'warn':'ok';
