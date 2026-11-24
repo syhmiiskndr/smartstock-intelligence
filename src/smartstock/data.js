@@ -44,8 +44,10 @@ export async function loadAll() {
 
   // refresh alerts first so the list below is current (ignore failures: alerts are a convenience)
   try { await supabase.rpc('refresh_alerts'); } catch (e) { /* ignore */ }
+  // forecasts (stock-out days, reorder suggestions, draft purchase orders); throttled in SQL, failures are not fatal
+  try { await supabase.rpc('generate_forecasts'); } catch (e) { /* ignore */ }
   const todayISO = new Date().toISOString().slice(0, 10);
-  const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ] = await Promise.all([
+  const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ, forecastsQ] = await Promise.all([
     supabase.from('profiles').select('user_id, full_name, role, company_id, is_active, email'),
     supabase.from('companies').select('*'),
     supabase.from('product_overview').select('*').order('product_name'),
@@ -64,6 +66,7 @@ export async function loadAll() {
       .in('status', ['ordered', 'received']).order('created_at', { ascending: false }).limit(20),
     supabase.from('batches').select('product_id, current_quantity, unit_cost').in('status', ['active', 'expired']).is('deleted_at', null)
       .gt('current_quantity', 0).lt('expiry_date', todayISO),
+    supabase.from('forecasts').select('*').not('forecast_date', 'is', null).order('generated_at', { ascending: false }).limit(300),
   ]);
   const prof = orThrow(profiles), comp = orThrow(companies), ov = orThrow(overview), bat = orThrow(batches),
     tx = orThrow(txs), ws = orThrow(wastes), vend = orThrow(vendors);
@@ -81,8 +84,19 @@ export async function loadAll() {
     a.q += num(b.current_quantity); a.v += num(b.current_quantity) * num(b.unit_cost);
     if (!a.sup && b.vendors) { a.sup = b.vendors.vendor_name; a.supId = b.vendor_id; }
   }
+  // newest forecast per product
+  const fcBy = {};
+  for (const f of (forecastsQ.data || [])) if (!fcBy[f.product_id]) fcBy[f.product_id] = f;
   const products = ov.map((p) => {
     const a = agg[p.product_id] || {};
+    const f = fcBy[p.product_id];
+    const fa = f && f.method !== 'rules' ? num(f.avg_daily_demand) : 0;
+    const fc = f ? {
+      method: f.method, dataDays: f.data_days || 0, conf: num(f.confidence), level: num(f.avg_daily_demand),
+      days: f.days_to_stockout == null ? null : num(f.days_to_stockout), stockoutDate: f.stockout_date,
+      lead: f.lead_time_days, rp: num(f.reorder_point), safety: num(f.safety_stock), need: !!f.reorder_needed, qty: num(f.suggested_order_qty),
+      urgency: f.urgency, trend: f.trend_pct == null ? null : num(f.trend_pct), atRisk: num(f.at_risk_qty), incoming: num(f.incoming_qty),
+    } : null;
     const reorder = num(p.min_stock_threshold) || 1;
     const name = p.product_name;
     return {
@@ -93,7 +107,7 @@ export async function loadAll() {
       qty: num(p.on_hand), cap: num(p.capacity) || reorder * 4, reorder,
       cost: a.q > 0 ? a.v / a.q : 0,
       exp: p.next_expiry ? Math.max(0, dayDiff(p.next_expiry, new Date())) : 999,
-      avg: Math.max(num(p.avg_daily_use), 0.05),
+      avg: Math.max(fa || num(p.avg_daily_use), 0.05), fc,
       sup: a.sup || (vend[0] && vend[0].vendor_name) || '-', supId: a.supId || (vend[0] && vend[0].vendor_id) || null,
     };
   });
@@ -130,7 +144,7 @@ export async function loadAll() {
     if (a.kind === 'purchase_order') {
       const it = (pl.items && pl.items[0]) || {}; const pr = pid[it.product_id]; if (!pr) continue;
       requests.push({ id: 'a' + a.approval_id, db: { t: 'approval', id: a.approval_id }, kind: 'order', item: pr.id, qty: num(it.quantity),
-        amount: num(it.quantity) * (num(it.unit_cost) || pr.cost), supplier: vname[pl.vendor_id] || pr.sup, by: names[a.requested_by] || 'Staff', rkey: 'low', status: 'pending' });
+        amount: num(it.quantity) * (num(it.unit_cost) || pr.cost), supplier: vname[pl.vendor_id] || pr.sup, by: pl.auto ? 'SmartStock AI' : names[a.requested_by] || 'Staff', rkey: pl.auto ? 'ai' : 'low', status: 'pending' });
     } else if (a.kind === 'waste') {
       const pr = pid[pl.product_id]; if (!pr) continue;
       requests.push({ id: 'a' + a.approval_id, db: { t: 'approval', id: a.approval_id }, kind: 'writeoff', item: pr.id, qty: num(pl.qty),

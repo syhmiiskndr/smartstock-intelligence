@@ -4,3 +4,5 @@ The stub fakes `auth.*` and the team's tables; the scenarios check RLS, FEFO usa
 
 Order used locally: 00 stub, 0002, 0004, 0003 (after inserting owner/admin/staff @smartstock.test into auth.users), 0005, then
 `01_scenarios.sql`, `02_week1.sql`, `03_demo.sql` (demo flag, `reset_demo()` permissions, empty new company + "load sample data").
+`0006_forecast_engine.sql` runs after 0005; `04_forecast.sql` checks the learning ladder (rules/average/trend/weekday), stock-out days,
+spoilage risk, draft purchase orders (no duplicates, approve/reject, no vendor, staff cannot approve) and company isolation.
