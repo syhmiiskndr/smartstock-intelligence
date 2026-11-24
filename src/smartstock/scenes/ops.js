@@ -12,7 +12,7 @@ export default function opsScene(api) {
    return `${sh(L('Approve','Lulus'),`${pend.length} ${L('waiting','menunggu')}`)}
    <div class="deck">${pend.length>2?'<div class="rcard back b2"></div>':''}${pend.length>1?'<div class="rcard back"></div>':''}
     <article class="rcard top" id="rtop"><span class="pill ${t.kind==='order'||t.kind==='stockin'?'':'warn'}">${kind}</span><h3>${esc(reqTitle(t))}</h3><div class="amt">${rm0(t.amount)}</div>
-    <div class="row"><span class="pill">${esc(byName(t.by))}</span>${t.supplier?`<span class="pill">${esc(t.supplier)}</span>`:''}<span class="pill ${t.kind==='order'?'bad':'warn'}">${esc(reqReason(t))}</span></div>
+    <div class="row"><span class="pill">${esc(byName(t.by))}</span>${t.supplier?`<span class="pill">${esc(t.supplier)}</span>`:''}<span class="pill ${t.kind==='order'&&(t.rkey!=='ai'||t.urgent)?'bad':'warn'}">${esc(reqReason(t))}</span></div>
     <div class="row" style="margin-top:20px"><button class="btn big" data-decide="no">${L('Reject','Tolak')}</button><button class="btn ok big" data-decide="ok" style="flex:1">${L('Approve','Lulus')}</button></div></article></div>
    <span class="say">${L('Drag the card right, or say','Seret kad ke kanan, atau sebut')} <q>${L('approve','lulus')}</q></span><div class="auto">${auto}</div>`;
   }
