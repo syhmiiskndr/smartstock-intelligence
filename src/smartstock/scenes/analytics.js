@@ -3,46 +3,41 @@
    usage heatmap, supplier scorecard. Click and hover handlers live in engine.js (data-an-*).
    Numbers come from the database (stock_transactions); the shape of the trend lines is computed here. */
 export default function analyticsScene(api) {
-  const { S, L, P, pn, rm0, fq, U, esc, ic, sh, dateStr, costToday, costAvg, stockValue, clamp, eta, runDays, aiTag } = api;
+  const { S, L, P, pn, rm0, fq, U, esc, ic, sh, dateStr, costToday, costAvg, stockValue, clamp, eta, runDays, aiTag, series } = api;
 
   const leadOf=n=>{const v=(S.vendors||[]).find(x=>x.name===n);return v?v.lead:2};
   const COL=['#0A84FF','#34C759','#FF9F0A','#AF52DE','#FF375F','#5AC8FA','#FFD60A','#8E8E93'];
-  const rnd=seed=>{let s=seed;return()=>{s=(s*9301+49297)%233280;return s/233280}};
   const sum=a=>a.reduce((x,y)=>x+y,0);
-  const wkF=d=>d===5||d===6?1.14:d===0?1.05:d===1?.93:.97; // weekends are busier
+  const chg=(a,b)=>b>0?Math.round((a/b-1)*100):0; // % change, 0 when there is nothing to compare with
   const dayOf=off=>{const d=new Date();d.setDate(d.getDate()+off);return d.getDay()};
 
-  /* daily series ending today. last = the real value for today, amp = noise size */
-  function gen(n,seed,scale,last,amp=.2){
-   const r=rnd(seed),out=[];
-   for(let i=0;i<n-1;i++){out.push(Math.round(scale*wkF(dayOf(i-(n-1)))*(1+(i/n-.5)*.1)*(1-amp/2+amp*r())*100)/100)}
-   out.push(last==null?Math.round(scale*(1-amp/2+amp*r())*100)/100:last);return out;
-  }
-  const share=(m,p)=>m==='usage'?S.use[p.id]/sum(P.map(q=>S.use[q.id])):m==='stock'?p.qty*p.cost/stockValue():S.use[p.id]*p.cost/costToday();
   const base={
-   cost:{en:'Cost',ms:'Kos',unit:'RM',good:'down',scale:()=>costAvg(),last:()=>costToday(),amp:.2},
-   usage:{en:'Usage',ms:'Guna',unit:'',good:'',scale:()=>sum(P.map(p=>p.avg)),last:()=>sum(P.map(p=>S.use[p.id])),amp:.18},
-   waste:{en:'Waste',ms:'Sisa',unit:'RM',good:'down',scale:()=>sum(S.waste.map(w=>w.amt))/7*1.1,last:()=>sum(S.waste.map(w=>w.amt))/7,amp:.5},
-   stock:{en:'Stock value',ms:'Nilai stok',unit:'RM',good:'',scale:()=>stockValue()*1.04,last:()=>stockValue(),amp:.06}
+   cost:{en:'Cost',ms:'Kos',unit:'RM',good:'down'},
+   usage:{en:'Usage',ms:'Guna',unit:'',good:''},
+   waste:{en:'Waste',ms:'Sisa',unit:'RM',good:'down'},
+   stock:{en:'Stock value',ms:'Nilai stok',unit:'RM',good:''}
   };
   const fmt=(m,v)=>base[m].unit==='RM'?rm0(v):Math.round(v).toLocaleString('en-US')+' '+L('units','unit');
-  const seriesFor=(m,n,cat,prev)=>{
-   const b=base[m],p=cat&&P.find(x=>x.id===cat),k=p?share(m,p):1;
-   const seed=({cost:11,usage:23,waste:37,stock:41})[m]+(p?[...p.id].reduce((a,c)=>a+c.charCodeAt(0),0):0)+(prev?977:0);
-   if(m==='cost'&&n===7&&!p&&!prev)return [...S.series,costToday()];
-   return gen(n,seed,b.scale()*k,prev?null:b.last()*k,b.amp);
-  };
-  /* 7-day forecast: recent level × weekday pattern × gentle trend (an estimate, not a promise) */
+  /* every series is real: it comes from the database through api.series */
+  const seriesFor=(m,n,cat,prev)=>series(m,n,{cat,shift:prev?n:0});
+  /* weekday pattern learned from the series itself (needs 14+ days; shrunk toward 1 when samples are few) */
+  function dowF(vals){
+   const n=vals.length,m=sum(vals)/n,f=Array(7).fill(1);if(n<14||m<=0)return f;
+   const s=Array(7).fill(0),c=Array(7).fill(0);vals.forEach((v,i)=>{const d=dayOf(i-(n-1));s[d]+=v;c[d]++});
+   for(let d=0;d<7;d++)if(c[d])f[d]=clamp((c[d]*(s[d]/c[d]/m)+2)/(c[d]+2),.5,1.8);
+   const a=sum(f)/7;return f.map(x=>x/a);
+  }
+  /* 7-day forecast: recent level x weekday pattern x gentle trend (an estimate, not a promise) */
   function forecast(vals){
-   const l7=vals.slice(-7),avg=sum(l7)/l7.length,slope=(avg-sum(vals.slice(-14,-7))/Math.max(1,vals.slice(-14,-7).length||1))/Math.max(avg,1);
-   return Array.from({length:7},(_,i)=>{const f=avg*wkF(dayOf(i+1))/ (sum([5,6,0,1,2,3,4].map(wkF))/7)*(1+clamp(slope,-.08,.08)*(i+1)/7);return Math.round(f*100)/100});
+   const F=dowF(vals),l7=vals.slice(-7),avg=sum(l7)/l7.length,prev=vals.slice(-14,-7),slope=prev.length?(avg-sum(prev)/prev.length)/Math.max(avg,1e-9):0;
+   return Array.from({length:7},(_,i)=>Math.round(avg*F[dayOf(i+1)]*(1+clamp(slope,-.08,.08)*(i+1)/7)*100)/100);
   }
   const lab=(i,n)=>i===n-1?L('Today','Hari ini'):i>=n?dateStr(i-(n-1)):dateStr(i-(n-1));
 
   function mainChart(m,n,cat){
    const cur=seriesFor(m,n,cat),prv=S.an.cmp?seriesFor(m,n,cat,true):null,fc=S.an.fc?forecast(cur):[];
    const total=n+fc.length,W=720,H=280,pl=46,pr=14,pt=14,pb=30,cw=W-pl-pr,ph=H-pt-pb;
-   const all=[...cur,...(prv||[]),...fc.map(v=>v*1.1)],mx=Math.max(...all)*1.12,mn=0;
+   const all=[...cur,...(prv||[]),...fc.map(v=>v*1.1)],mx=Math.max(...all,.01)*1.12,mn=0;
    const X=i=>pl+i*cw/(total-1),Y=v=>pt+(1-(v-mn)/(mx-mn))*ph;
    const line=(a,off=0)=>a.map((v,i)=>`${i?'L':'M'}${X(i+off).toFixed(1)} ${Y(v).toFixed(1)}`).join('');
    const smooth=(a,off=0)=>a.map((v,i)=>{const x=X(i+off),y=Y(v);if(!i)return `M${x.toFixed(1)} ${y.toFixed(1)}`;const px=X(i-1+off),py=Y(a[i-1]),c=(x-px)/2;return `C${(px+c).toFixed(1)} ${py.toFixed(1)} ${(x-c).toFixed(1)} ${y.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`}).join('');
@@ -68,7 +63,8 @@ export default function analyticsScene(api) {
   }
 
   function donut(cat){
-   const vals=P.map(p=>({p,v:S.use[p.id]*p.cost})).sort((a,b)=>b.v-a.v),tot=sum(vals.map(x=>x.v)),R=54,C=2*Math.PI*R;let acc=0;
+   const vals=P.map(p=>({p,v:sum(series('cost',S.an.range,{cat:p.id}))})).sort((a,b)=>b.v-a.v),tot=sum(vals.map(x=>x.v)),R=54,C=2*Math.PI*R;let acc=0;
+   if(!tot)return `<p class="meta">${L('No usage recorded in this period yet.','Belum ada penggunaan direkod dalam tempoh ini.')}</p>`;
    const arcs=vals.map((x,i)=>{const f=x.v/tot,len=Math.max(0,f*C-2),off=-acc*C;acc+=f;const on=cat===x.p.id,dim=cat&&!on;
     return `<circle class="an-arc" cx="70" cy="70" r="${R}" fill="none" stroke="${COL[i%COL.length]}" stroke-width="${on?24:18}" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${off}" transform="rotate(-90 70 70)" opacity="${dim?.25:1}" data-an-cat="${x.p.id}" data-tip="${esc(pn(x.p))}: ${rm0(x.v)} (${Math.round(f*100)}%)"/>`}).join('');
    const sel=cat&&vals.find(x=>x.p.id===cat);
@@ -83,11 +79,14 @@ export default function analyticsScene(api) {
    <p class="say" style="margin:10px 0 0">${L('The dark marker is the supplier delivery time. A bar that ends before it means stock runs out before the order can arrive.','Penanda gelap ialah masa penghantaran pembekal. Bar yang berakhir sebelum garisan bermakna stok habis sebelum order tiba.')}</p></div>`;
   }
 
+  /* real: units used per weekday and time of day, averaged over the last 4 weeks (from usage timestamps) */
   function heat(){
-   const days=[L('Mon','Isn'),L('Tue','Sel'),L('Wed','Rab'),L('Thu','Kha'),L('Fri','Jum'),L('Sat','Sab'),L('Sun','Ahd')],slots=[L('Morning','Pagi'),L('Lunch','Tengah hari'),L('Afternoon','Petang'),L('Evening','Malam')];
-   const r=rnd(5),w=[.45,1,.55,.9],tot=sum(P.map(p=>p.avg));let best={v:0};
-   const cells=days.map((d,di)=>slots.map((s,si)=>{const v=clamp(w[si]*(di>=4?1.18:.92)*(.8+.4*r()),0,1.3)/1.3;const u=Math.round(v*tot/ 2.2);if(v>best.v)best={v,d,s};return `<i style="--a:${(.12+v*.88).toFixed(2)}" data-tip="${d} ${s.toLowerCase()}: ~${u} ${L('units used','unit digunakan')}"></i>`}).join('')).join('');
-   return `<div class="an-heat"><div class="an-hx"><span></span>${slots.map(s=>`<span>${s}</span>`).join('')}</div>${days.map((d,i)=>`<div class="an-hr"><span>${d}</span>${cells.split('</i>').slice(i*4,i*4+4).map(c=>c?c+'</i>':'').join('')}</div>`).join('')}</div><p class="say" style="margin:10px 0 0">${L(`Busiest: ${best.d} ${best.s.toLowerCase()}. Stock the fast movers before then.`,`Paling sibuk: ${best.d} ${best.s.toLowerCase()}. Sediakan stok sebelum itu.`)}</p>`;
+   const days=[L('Mon','Isn'),L('Tue','Sel'),L('Wed','Rab'),L('Thu','Kha'),L('Fri','Jum'),L('Sat','Sab'),L('Sun','Ahd')],dows=[1,2,3,4,5,6,0],slots=[L('Morning','Pagi'),L('Lunch','Tengah hari'),L('Afternoon','Petang'),L('Evening','Malam')];
+   const hm=(S.daily&&S.daily.heat)||[],q=(dw,sl)=>sum(hm.filter(h=>h.dow===dw&&h.slot===sl).map(h=>h.qty))/4,mx=Math.max(0,...dows.flatMap(dw=>slots.map((_,sl)=>q(dw,sl))));
+   if(!mx)return `<p class="meta">${L('Record some usage and the busy times will show here.','Rekod sedikit penggunaan dan waktu sibuk akan dipaparkan di sini.')}</p>`;
+   let best={v:0};
+   const rows=days.map((d,di)=>`<div class="an-hr"><span>${d}</span>${slots.map((s,si)=>{const u=q(dows[di],si),v=u/mx;if(v>best.v)best={v,d,s};return `<i style="--a:${(.12+v*.88).toFixed(2)}" data-tip="${d} ${s.toLowerCase()}: ~${Math.round(u*10)/10} ${L('units used','unit digunakan')}"></i>`}).join('')}</div>`).join('');
+   return `<div class="an-heat"><div class="an-hx"><span></span>${slots.map(s=>`<span>${s}</span>`).join('')}</div>${rows}</div><p class="say" style="margin:10px 0 0">${L(`Busiest: ${best.d} ${best.s.toLowerCase()}. Stock the fast movers before then.`,`Paling sibuk: ${best.d} ${best.s.toLowerCase()}. Sediakan stok sebelum itu.`)}</p>`;
   }
 
   function suppliers(){
@@ -97,7 +96,7 @@ export default function analyticsScene(api) {
   }
 
   function insights(m,n,cat,cur,prv){
-   const out=[],cs=sum(cur),ps=sum(prv),pct=Math.round((cs/ps-1)*100),bm=base[m];
+   const out=[],cs=sum(cur),ps=sum(prv),pct=chg(cs,ps),bm=base[m];
    const dr=P.map(p=>({p,x:((S.use[p.id]||0)-p.avg)*p.cost})).sort((a,b)=>b.x-a.x)[0];
    const good=bm.good==='down'?pct<=0:bm.good==='up'?pct>=0:null;
    out.push({t:good===false?'warn':'ok',h:L(`${L(bm.en,bm.ms)} is ${Math.abs(pct)}% ${pct>=0?'higher':'lower'} than the previous ${n} days`,`${bm.ms} ${Math.abs(pct)}% ${pct>=0?'lebih tinggi':'lebih rendah'} berbanding ${n} hari sebelum ini`),d:`${fmt(m,cs)} ${L('vs','berbanding')} ${fmt(m,ps)}.`+(m==='cost'&&dr.x>0?' '+L(`${pn(dr.p)} is the biggest driver today (+${rm0(dr.x)} over normal).`,`${pn(dr.p)} pemacu terbesar hari ini (+${rm0(dr.x)} melebihi biasa).`):'')});
@@ -110,9 +109,9 @@ export default function analyticsScene(api) {
 
   function analyticsScene(){
    const A=S.an,m=A.metric,n=A.range,cat=A.cat,b=base[m];
-   const cur=seriesFor(m,n,cat),prv=seriesFor(m,n,cat,true),cs=sum(cur),ps=sum(prv),pct=Math.round((cs/ps-1)*100);
+   const cur=seriesFor(m,n,cat),prv=seriesFor(m,n,cat,true),cs=sum(cur),ps=sum(prv),pct=chg(cs,ps);
    const tone=p=>b.good==='down'?(p<=0?'ok':'warn'):b.good==='up'?(p>=0?'ok':'warn'):'';
-   const kpis=Object.keys(base).map(k=>{const c=seriesFor(k,n,cat),p=seriesFor(k,n,cat,true),d=Math.round((sum(c)/sum(p)-1)*100),mx=Math.max(...c),mn=Math.min(...c),pts=c.map((v,i)=>`${(i/(c.length-1)*100).toFixed(1)},${(26-(v-mn)/(mx-mn||1)*22).toFixed(1)}`).join(' ');
+   const kpis=Object.keys(base).map(k=>{const c=seriesFor(k,n,cat),p=seriesFor(k,n,cat,true),d=chg(sum(c),sum(p)),mx=Math.max(...c),mn=Math.min(...c),pts=c.map((v,i)=>`${(i/(c.length-1)*100).toFixed(1)},${(26-(v-mn)/(mx-mn||1)*22).toFixed(1)}`).join(' ');
     const t=base[k].good==='down'?(d<=0?'ok':'warn'):base[k].good==='up'?(d>=0?'ok':'warn'):'';
     return `<button class="w an-kpi ${k===m?'on':''}" data-an-metric="${k}" aria-pressed="${k===m}"><span class="cap">${L(base[k].en,base[k].ms)}</span><span class="num">${k==='usage'?Math.round(c[c.length-1]):rm0(c[c.length-1])}${k==='usage'?`<small style="font-size:13px;color:var(--ink-2)"> ${L('units','unit')}</small>`:''}</span><svg viewBox="0 0 100 30" preserveAspectRatio="none" class="an-spark"><polyline points="${pts}" fill="none" stroke="${k===m?'var(--accent)':'var(--ink-2)'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg><span class="pill ${t}">${d>=0?'+':''}${d}% ${L('vs previous','vs sebelum')}</span></button>`}).join('');
    const sel=cat&&P.find(p=>p.id===cat);
@@ -120,7 +119,7 @@ export default function analyticsScene(api) {
    <div class="an-grid">
     <div class="an-kpis">${kpis}</div>
     <div class="w an-chartcard">
-     <div class="an-tools"><div class="seg" role="group" aria-label="${L('Range','Julat')}">${[7,30,90].map(r=>`<button data-an-range="${r}" aria-pressed="${n===r}">${r}D</button>`).join('')}</div>
+     <div class="an-tools"><div class="seg" role="group" aria-label="${L('Range','Julat')}">${[7,30,60].map(r=>`<button data-an-range="${r}" aria-pressed="${n===r}">${r}D</button>`).join('')}</div>
       <button class="tbtn" data-an-toggle="cmp" aria-pressed="${A.cmp}">${L('Compare previous','Banding sebelum')}</button>
       <button class="tbtn" data-an-toggle="fc" aria-pressed="${A.fc}">${ic('trend',15)}<span>${L('Forecast','Ramalan')}</span></button>
       ${sel?`<button class="tbtn" data-an-cat="${sel.id}" aria-pressed="true">${pn(sel)} ${ic('x',13)}</button>`:''}</div>
@@ -133,7 +132,7 @@ export default function analyticsScene(api) {
     <div class="w an-half"><span class="cap">${L('Supplier scorecard','Kad skor pembekal')}</span>${suppliers()}</div>
     <div class="w an-full"><span class="cap">${ic('mic',14)} ${L('What changed and why','Apa yang berubah dan sebabnya')}</span>${insights(m,n,cat,cur,prv)}</div>
    </div>
-   <p class="demo-note">${L('Sample data. Forecast and runway are estimates from recent use, not guarantees.','Data contoh. Ramalan dan landasan ialah anggaran berdasarkan penggunaan terkini, bukan jaminan.')}</p>`;
+   <p class="demo-note">${L('All numbers come from your own stock records. Forecast and runway are estimates from recent use, not guarantees.','Semua nombor datang daripada rekod stok anda. Ramalan dan landasan ialah anggaran berdasarkan penggunaan terkini, bukan jaminan.')}</p>`;
   }
 
   return { analytics:analyticsScene };

@@ -31,6 +31,7 @@ const FRUIT_EN = {
 const UNIT = { kg: 'kg', g: 'kg', pcs: 'biji' };
 const day0 = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const dayDiff = (a, b) => Math.round((day0(a) - day0(b)) / 864e5);
+export const addDays = (key, n) => { const [y, m, d] = key.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
 const num = (v) => (v == null ? 0 : Number(v));
 const hhmm = (d) => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 let CID = null; // company id of the signed-in user, set by loadAll
@@ -47,7 +48,7 @@ export async function loadAll() {
   // forecasts (stock-out days, reorder suggestions, draft purchase orders); throttled in SQL, failures are not fatal
   try { await supabase.rpc('generate_forecasts'); } catch (e) { /* ignore */ }
   const todayISO = new Date().toISOString().slice(0, 10);
-  const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ, forecastsQ] = await Promise.all([
+  const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ, forecastsQ, dailyQ] = await Promise.all([
     supabase.from('profiles').select('user_id, full_name, role, company_id, is_active, email'),
     supabase.from('companies').select('*'),
     supabase.from('product_overview').select('*').order('product_name'),
@@ -67,6 +68,7 @@ export async function loadAll() {
     supabase.from('batches').select('product_id, current_quantity, unit_cost').in('status', ['active', 'expired']).is('deleted_at', null)
       .gt('current_quantity', 0).lt('expiry_date', todayISO),
     supabase.from('forecasts').select('*').not('forecast_date', 'is', null).order('generated_at', { ascending: false }).limit(300),
+    supabase.rpc('daily_metrics', { p_days: 120 }),
   ]);
   const prof = orThrow(profiles), comp = orThrow(companies), ov = orThrow(overview), bat = orThrow(batches),
     tx = orThrow(txs), ws = orThrow(wastes), vend = orThrow(vendors);
@@ -95,7 +97,7 @@ export async function loadAll() {
       method: f.method, dataDays: f.data_days || 0, conf: num(f.confidence), level: num(f.avg_daily_demand),
       days: f.days_to_stockout == null ? null : num(f.days_to_stockout), stockoutDate: f.stockout_date,
       lead: f.lead_time_days, rp: num(f.reorder_point), safety: num(f.safety_stock), need: !!f.reorder_needed, qty: num(f.suggested_order_qty),
-      urgency: f.urgency, trend: f.trend_pct == null ? null : num(f.trend_pct), atRisk: num(f.at_risk_qty), incoming: num(f.incoming_qty),
+      urgency: f.urgency, at: f.generated_at, trend: f.trend_pct == null ? null : num(f.trend_pct), atRisk: num(f.at_risk_qty), incoming: num(f.incoming_qty),
     } : null;
     const reorder = num(p.min_stock_threshold) || 1;
     const name = p.product_name;
@@ -113,23 +115,44 @@ export async function loadAll() {
   });
   const pid = Object.fromEntries(products.map((p) => [p.dbId, p]));
 
-  // today's usage, 6 earlier days of usage cost, recent moves
-  const use = Object.fromEntries(products.map((p) => [p.id, 0]));
-  const series = [0, 0, 0, 0, 0, 0];
+  // recent moves (activity feed)
   const moves = [];
   const today = new Date();
   for (const t of tx) {
     const pr = t.batches && pid[t.batches.product_id];
     if (!pr) continue;
     const q = Math.abs(num(t.quantity_change));
-    if (t.transaction_type === 'usage') {
-      const ago = dayDiff(today, t.created_at);
-      if (ago === 0) use[pr.id] += q;
-      else if (ago >= 1 && ago <= 6) series[6 - ago] += q * num(t.batches.unit_cost);
-    }
     if (moves.length < 12 && ['usage', 'receive', 'waste'].includes(t.transaction_type)) {
       moves.push({ p: pr.id, type: t.transaction_type, q, t: dayDiff(today, t.created_at) === 0 ? hhmm(t.created_at) : 'Yesterday', who: names[t.user_id] || 'Staff' });
     }
+  }
+
+  // daily numbers for every chart: from daily_metrics (0007). Before 0007 is run, fall back to the 14 days already loaded.
+  let daily;
+  const dr = dailyQ && !dailyQ.error ? dailyQ.data : null;
+  if (dr && dr.today) {
+    daily = { today: dr.today, rows: (dr.rows || []).map((r) => ({ d: r.d, p: String(r.p), uq: num(r.uq), uc: num(r.uc), wc: num(r.wc), nc: num(r.nc) })),
+      heat: (dr.heat || []).map((h) => ({ dow: h.dow, slot: h.slot, qty: num(h.qty) })) };
+  } else {
+    const m = {};
+    for (const t of tx) {
+      const pr = t.batches && pid[t.batches.product_id]; if (!pr) continue;
+      const d = new Date(t.created_at).toLocaleDateString('en-CA');
+      const r = (m[d + '|' + pr.id] ||= { d, p: pr.id, uq: 0, uc: 0, wc: 0, nc: 0 });
+      const qc = num(t.quantity_change), cst = num(t.batches.unit_cost);
+      if (t.transaction_type === 'usage') { r.uq += -qc; r.uc += -qc * cst; }
+      if (t.transaction_type === 'waste') r.wc += -qc * cst;
+      r.nc += qc * cst;
+    }
+    daily = { today: new Date().toLocaleDateString('en-CA'), rows: Object.values(m), heat: [] };
+  }
+  // today's usage per product, and the usage cost of the 6 days before today
+  const use = Object.fromEntries(products.map((p) => [p.id, 0]));
+  const series = [0, 0, 0, 0, 0, 0];
+  for (const r of daily.rows) {
+    if (r.d === daily.today && r.p in use) use[r.p] += r.uq;
+    const ago = Math.round((Date.parse(daily.today) - Date.parse(r.d)) / 864e5);
+    if (ago >= 1 && ago <= 6) series[6 - ago] += r.uc;
   }
   // waste cost per product over 7 days (UI needs at least one row)
   const wmap = {};
@@ -175,7 +198,7 @@ export async function loadAll() {
   return {
     vendors: vendorsOut, requests, orders, alerts, expired,
     me: { id: user.id, companyId: meRow.company_id, name: meRow.full_name || 'You', role: meRow.role, company: (comp[0] && comp[0].company_name) || '', isDemo: !!(comp[0] && comp[0].is_demo) },
-    products, use, series, moves, waste,
+    products, use, series, moves, waste, daily,
     rules: { adminFinance: !!st.admin_can_see_finance, limit: num(st.waste_approval_limit) || 50 },
     team: prof.map((p) => ({ id: p.user_id, name: p.full_name || p.email || 'Member', role: p.role, active: p.is_active !== false, email: p.email || '' })),
   };

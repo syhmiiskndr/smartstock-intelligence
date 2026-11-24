@@ -4,15 +4,15 @@ export default function costScene(api) {
 
   function costScene2(){
    const touch=matchMedia('(hover: none)').matches;
-   const days=seriesN(S.range),n=days.length,cost=days[n-1],prev=days.slice(0,-1),avg=prev.reduce((a,b)=>a+b,0)/prev.length,pct=Math.round((cost/avg-1)*100);
-   const W=560,H=170,gap=n>7?4:12,bw=(W-gap*(n-1))/n,max=Math.max(...days)*1.2;
+   const days=seriesN(S.range),n=days.length,cost=days[n-1],prev=days.slice(0,-1),avg=prev.reduce((a,b)=>a+b,0)/prev.length,pct=avg>0?Math.round((cost/avg-1)*100):0;
+   const W=560,H=170,gap=n>7?4:12,bw=(W-gap*(n-1))/n,max=Math.max(...days,.01)*1.2;
    const lab=i=>i===n-1?L('Today','Hari ini'):dateStr(i-(n-1));
-   const bars=days.map((v,i)=>{const h=v/max*H,x=i*(bw+gap),d=Math.round((v/avg-1)*100);
+   const bars=days.map((v,i)=>{const h=v/max*H,x=i*(bw+gap),d=avg>0?Math.round((v/avg-1)*100):0;
     const showLab=n===7||i%5===0||i===n-1;
     return `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" rx="${Math.min(10,bw/3)}" fill="${i===n-1?'var(--accent)':'var(--accent-soft)'}" data-tip="${lab(i)}: ${rm0(v)} (${d>=0?'+':''}${d}% ${L('vs average','dari purata')})"/>${showLab?`<text x="${x+bw/2}" y="${H+18}" text-anchor="${i===n-1?'end':'middle'}">${n===7?(i===n-1?L('Today','Hari ini'):new Date(Date.now()-(n-1-i)*864e5).toLocaleDateString(S.lang==='ms'?'ms-MY':'en-GB',{weekday:'short'})):(i===n-1?L('Today','Hari ini'):dateStr(i-(n-1)))}</text>`:''}`}).join('');
    const ay=H-avg/max*H;
-   const vals=p=>S.use[p.id]*p.cost,top=[...P].sort((a,b)=>vals(b)-vals(a)).slice(0,4);
-   const drv=top.map(p=>`<div class="drv"><span style="text-align:left;color:var(--ink)">${pn(p)}</span><i><u style="width:${(vals(p)/vals(top[0])*100).toFixed(0)}%"></u></i><span>${rm0(vals(p))}</span></div>`).join('');
+   const vals=p=>(S.use[p.id]||0)*p.cost,top=[...P].sort((a,b)=>vals(b)-vals(a)).slice(0,4);
+   const drv=top.map(p=>`<div class="drv"><span style="text-align:left;color:var(--ink)">${pn(p)}</span><i><u style="width:${(vals(top[0])>0?vals(p)/vals(top[0])*100:0).toFixed(0)}%"></u></i><span>${rm0(vals(p))}</span></div>`).join('');
    return `${sh(L('Cost','Kos'),L(`${n-1}-day average ${rm0(avg)}`,`purata ${n-1} hari ${rm0(avg)}`))}
    <div class="bignum" id="bn">${rm0(cost)}</div>
    <span class="pill ${pct>10?'warn':'ok'}">${pct>=0?'+':''}${pct}% ${L('vs average','dari purata')}</span>
