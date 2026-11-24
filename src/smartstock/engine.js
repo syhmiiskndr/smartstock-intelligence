@@ -247,7 +247,7 @@ export function mountVoiceApp(host, opts = {}) {
   const sayHint=t=>`<span class="say">${L('or say','atau sebut')} <q>${esc(t)}</q></span>`;
   const orderSay=p=>`Order ${suggest(p)} ${uw(p.unit)} ${pn(p).toLowerCase()}`;
   const reqTitle=r=>{const p=prod(r.item),a=`${fq(r.qty)} ${U(p.unit)} ${pn(p)}`;return r.kind==='order'?`Order ${a}`:r.kind==='stockin'?L(`Receive ${a}`,`Terima ${a}`):L(`Write off ${a}`,`Tulis-off ${a}`)};
-  const reqReason=r=>{const p=prod(r.item);return r.rkey==='in'?L('Staff delivery','Penghantaran staf'):r.rkey==='ai'?L('Forecast: runs out in ','Ramalan: habis dalam ')+eta(p):r.rkey==='exp'?L('Expired','Luput'):r.rkey==='rep'?L('Reported spoiled','Dilapor rosak'):L('Runs out in ','Habis dalam ')+eta(p)};
+  const reqReason=r=>{const p=prod(r.item);return r.rkey==='in'?L('Staff delivery','Penghantaran staf'):r.rkey==='ai'?(p.fc&&runDays(p)>(p.fc.lead||3)+2?(p.fc.atRisk>0.05?L('Forecast: part of the stock will spoil','Ramalan: sebahagian stok akan rosak'):L('Forecast: stock getting low','Ramalan: stok semakin rendah')):L('Forecast: runs out in ','Ramalan: habis dalam ')+eta(p)):r.rkey==='exp'?L('Expired','Luput'):r.rkey==='rep'?L('Reported spoiled','Dilapor rosak'):L('Runs out in ','Habis dalam ')+eta(p)};
   const byName=b=>b==='staff'?L('Staff','Staf'):b;
 
   const SCENES={};const missingScene=()=>`<div class="sh"><h1 class="h1">${L("Not available yet","Belum tersedia")}</h1><p class="meta">${L("This page has not been merged into the project yet.","Page ini belum digabungkan ke dalam projek.")}</p></div>`;

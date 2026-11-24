@@ -167,7 +167,7 @@ export async function loadAll() {
     if (a.kind === 'purchase_order') {
       const it = (pl.items && pl.items[0]) || {}; const pr = pid[it.product_id]; if (!pr) continue;
       requests.push({ id: 'a' + a.approval_id, db: { t: 'approval', id: a.approval_id }, kind: 'order', item: pr.id, qty: num(it.quantity),
-        amount: num(it.quantity) * (num(it.unit_cost) || pr.cost), supplier: vname[pl.vendor_id] || pr.sup, by: pl.auto ? 'SmartStock AI' : names[a.requested_by] || 'Staff', rkey: pl.auto ? 'ai' : 'low', status: 'pending' });
+        amount: num(it.quantity) * (num(it.unit_cost) || pr.cost), supplier: vname[pl.vendor_id] || pr.sup, by: pl.auto ? 'SmartStock AI' : names[a.requested_by] || 'Staff', rkey: pl.auto ? 'ai' : 'low', urgent: !!(pl.why && pl.why.urgency === 'late'), status: 'pending' });
     } else if (a.kind === 'waste') {
       const pr = pid[pl.product_id]; if (!pr) continue;
       requests.push({ id: 'a' + a.approval_id, db: { t: 'approval', id: a.approval_id }, kind: 'writeoff', item: pr.id, qty: num(pl.qty),

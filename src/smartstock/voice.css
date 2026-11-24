@@ -216,11 +216,14 @@
 #ss-root .bub:hover{transform:scale(1.12)}
 
 /* approvals */
-#ss-root .deck{position:relative;max-width:470px;margin:24px 0 0;padding-bottom:56px}
+#ss-root .deck{position:relative;max-width:470px;margin:24px 0 0;padding-bottom:40px}
 #ss-root .rcard{border-radius:32px;padding:24px}
-#ss-root .rcard.back{position:absolute;left:14px;right:14px;top:14px;height:100%;z-index:0;opacity:.7;box-shadow:none}
-#ss-root .rcard.back.b2{left:28px;right:28px;top:26px;opacity:.4}
-#ss-root .rcard.top{z-index:1;touch-action:pan-y;cursor:grab;transition:transform .45s var(--spring)}
+/* cards waiting behind the top one: same height as the top card, narrower, peeking out below it */
+#ss-root .rcard.back{position:absolute;left:16px;right:16px;top:16px;bottom:24px;z-index:0;padding:0;background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.08);opacity:.78;pointer-events:none}
+#ss-root .rcard.back.b2{left:32px;right:32px;top:28px;bottom:8px;opacity:.5;box-shadow:none}
+#ss-root .rcard.back::before{display:none}
+/* the top card is solid so the cards behind never show through it */
+#ss-root .rcard.top{z-index:1;touch-action:pan-y;cursor:grab;transition:transform .45s var(--spring);background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid var(--line);box-shadow:var(--shadow-lg)}
 #ss-root .rcard.top[data-dir=ok]{box-shadow:0 0 0 3px var(--r-fresh),var(--shadow-lg)}#ss-root .rcard.top[data-dir=no]{box-shadow:0 0 0 3px var(--r-crit),var(--shadow-lg)}
 #ss-root .rcard .amt{font:700 62px/1 var(--font);letter-spacing:-.045em;margin:14px 0 10px}
 #ss-root .rcard h3{margin:8px 0 0;font:600 20px var(--font);letter-spacing:-.02em}
