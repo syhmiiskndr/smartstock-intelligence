@@ -1,6 +1,6 @@
 /* Scene "home" – one file per page. Receives the shared engine API and returns its render functions. */
 export default function homeScene(api) {
-  const { S, L, sayHint, examples, ic, ringSet, P, costToday, costAvg, pending, clamp, seriesN, pn, eta, runDays, aiTag, esc, orderSay, suggest, U, fq, greet, rm0, canFin, isOwner, who, stockValue } = api;
+  const { S, L, sayHint, examples, ic, ringSet, P, costToday, costAvg, pending, clamp, seriesN, series, pn, eta, runDays, aiTag, esc, orderSay, suggest, U, fq, greet, rm0, canFin, isOwner, who, stockValue } = api;
 
   function homeStaff(){
    const done=S.tasks.filter(t=>t.done).length;
@@ -27,7 +27,6 @@ export default function homeScene(api) {
   const nf=v=>Math.round(v*10)/10;
   const dtxt=x=>x<1?Math.max(1,Math.round(x*24))+L(' hours',' jam'):nf(x)+L(' days',' hari');
   const sparkPts=a=>{const mx=Math.max(...a),mn=Math.min(...a);return a.map((v,i)=>`${(i/(a.length-1)*100).toFixed(1)},${(24-(v-mn)/(mx-mn||1)*21).toFixed(1)}`).join(' ')};
-  const wob=(seed,n,base)=>{let x=seed;return Array.from({length:n},(_,i)=>{x=(x*9301+49297)%233280;return base*(.94+.08*x/233280+(i/n)*.02)})};
 
   /* one product at day d: stock falls with use, open orders arrive after the supplier lead time */
   function rowFor(p,d,ord,used){
@@ -73,15 +72,15 @@ export default function homeScene(api) {
    const healthy=!r.needsOrder&&!r.ord&&!r.canUse;
    const acts=`${r.needsOrder?`<button class="btn primary pl-act" data-pl="order" data-id="${p.id}">${L('Order','Order')} ${sug} ${U(p.unit)}${price}</button>`:''}${r.ord?`<span class="pl-done">${L(`Ordered. ${p.sup} delivers in ${r.lead} day${r.lead>1?'s':''}.`,`Dah order. ${p.sup} hantar dalam ${r.lead} hari.`)}</span>`:''}${r.canUse&&!r.handled?`<button class="btn pl-act pl-use" data-pl="use" data-id="${p.id}">${L('Use first or put on special','Guna dahulu atau jadikan promosi')}</button>`:''}${r.handled?`<span class="pl-done">${L('Marked to use first','Ditanda guna dahulu')}</span>`:''}${healthy?`<span class="pl-done">${L('Nothing to do here','Tiada tindakan di sini')}</span>`:''}`;
    const risk=rows.filter(x=>x.expiring||x.expired).reduce((a,x)=>a+x.p.qty*x.p.cost,0),waste=sum(S.waste.map(w=>w.amt)),open=S.orders.filter(o=>!o.done).length;
-   const kp=(cap,val,sp,sub,tn,sc)=>`<div class="pl-kpi"><span>${cap}</span><b>${val}</b><svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="${sparkPts(sp)}" fill="none" stroke="${sc||'var(--accent)'}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg><em class="${tn||''}">${sub}</em></div>`;
+   const kp=(cap,val,sp,sub,tn,sc)=>`<div class="pl-kpi"><span>${cap}</span><b>${val}</b>${sp?`<svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="${sparkPts(sp)}" fill="none" stroke="${sc||'var(--accent)'}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`:''}<em class="${tn||''}">${sub}</em></div>`;
    const kpis=own?kp(L('Cost today','Kos hari ini'),rm0(costToday()),seriesN(7),`${pct>=0?'+':''}${pct}% ${L('vs your average','berbanding purata')}`,pct>10?'warn':'ok','var(--warn)')
-     +kp(L('Waste this week','Sisa minggu ini'),rm0(waste),S.waste.map(w=>w.amt).reverse().concat(0).slice(0,7),L('Actual, this week','Sebenar, minggu ini'),waste>30?'warn':'ok','var(--ok)')
-     +kp(L('Approvals waiting','Kelulusan menunggu'),String(pending().length),wob(2,7,pending().length+1),pending().length?L('Tap Approve to review','Ketik Lulus untuk semak'):L('All clear','Semua selesai'),pending().length?'warn':'ok','var(--warn)')
-     +kp(L('Money at risk','Wang berisiko'),rm0(risk),wob(7,7,risk+1),L('Estimate: expires within 3 days','Anggaran: luput dalam 3 hari'),'',''):
-     kp(L('Team tasks','Tugas pasukan'),`${doneT} ${L('of','daripada')} ${S.tasks.length}`,wob(3,7,doneT+1),S.tasks.find(t=>!t.done)?L(S.tasks.find(t=>!t.done).en,S.tasks.find(t=>!t.done).ms):L('All done','Semua siap'),'','#AF52DE')
-     +kp(L('Deliveries open','Penghantaran terbuka'),String(open),wob(5,7,open+1),open?L('Orders on the way','Order dalam perjalanan'):L('No open orders','Tiada order terbuka'),'','var(--ok)')
-     +kp(L('Approvals waiting','Kelulusan menunggu'),String(pending().length),wob(2,7,pending().length+1),pending().length?L('Waiting for the owner','Menunggu pemilik'):L('All clear','Semua selesai'),pending().length?'warn':'ok','var(--warn)')
-     +kp(L('Items to reorder','Item untuk order semula'),String(fixO.length),wob(9,7,fixO.length+1),L('Tap a tile to order','Ketik ubin untuk order'),fixO.length?'warn':'ok','var(--bad)');
+     +kp(L('Waste this week','Sisa minggu ini'),rm0(waste),series('waste',7),L('Actual, this week','Sebenar, minggu ini'),waste>30?'warn':'ok','var(--ok)')
+     +kp(L('Approvals waiting','Kelulusan menunggu'),String(pending().length),null,pending().length?L('Tap Approve to review','Ketik Lulus untuk semak'):L('All clear','Semua selesai'),pending().length?'warn':'ok','var(--warn)')
+     +kp(L('Money at risk','Wang berisiko'),rm0(risk),null,L('Estimate: expires within 3 days','Anggaran: luput dalam 3 hari'),'',''):
+     kp(L('Team tasks','Tugas pasukan'),`${doneT} ${L('of','daripada')} ${S.tasks.length}`,null,S.tasks.find(t=>!t.done)?L(S.tasks.find(t=>!t.done).en,S.tasks.find(t=>!t.done).ms):L('All done','Semua siap'),'','#AF52DE')
+     +kp(L('Deliveries open','Penghantaran terbuka'),String(open),null,open?L('Orders on the way','Order dalam perjalanan'):L('No open orders','Tiada order terbuka'),'','var(--ok)')
+     +kp(L('Approvals waiting','Kelulusan menunggu'),String(pending().length),null,pending().length?L('Waiting for the owner','Menunggu pemilik'):L('All clear','Semua selesai'),pending().length?'warn':'ok','var(--warn)')
+     +kp(L('Items to reorder','Item untuk order semula'),String(fixO.length),null,L('Tap a tile to order','Ketik ubin untuk order'),fixO.length?'warn':'ok','var(--bad)');
    const headline=gain===0?(d===0?L('Everything that needs you is handled. Nice work.','Semua yang perlukan anda sudah diurus. Syabas.'):L('With your actions in place, this is how the next days look.','Dengan tindakan anda, beginilah hari-hari seterusnya.'))
      :(own?L(`${d===0?'Right now':dayLabel} ${need} thing${need===1?'':'s'} need${need===1?'s':''} you. Fix ${need===1?'it':'them'} and the score climbs to ${best}.`,`${d===0?'Sekarang':dayLabel} ${need} perkara perlukan anda. Selesaikan dan skor naik ke ${best}.`):L(`${need} thing${need===1?'':'s'} to sort out. Doing ${need===1?'it':'them'} lifts readiness to ${best}.`,`${need} perkara untuk diselesaikan. Buat semuanya, kesediaan naik ke ${best}.`));
    const dstr=new Date().toLocaleDateString(S.lang==='ms'?'ms-MY':'en-GB',{weekday:'long',day:'numeric',month:'long'});

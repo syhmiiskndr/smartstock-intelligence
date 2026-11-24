@@ -80,7 +80,7 @@ export function mountVoiceApp(host, opts = {}) {
   if(!S.pl)S.pl={sel:null,day:0,used:{},filter:null,playing:false,shown:0,toast:''};
   /* clear everything that belongs to the signed-in company (used on sign-out) */
   function clearData(){
-   P.length=0;Object.assign(S,{use:{},series:[],requests:[],waste:[],tasks:[],moves:[],orders:[],live:false,me:null,team:null,vendors:null,expired:null,authMode:null});
+   P.length=0;Object.assign(S,{daily:null,use:{},series:[],requests:[],waste:[],tasks:[],moves:[],orders:[],live:false,me:null,team:null,vendors:null,expired:null,authMode:null});
    S.notes=[];S.rules.adminFinance=false;S.pl.sel=null;S.pl.used={};
   }
   function alertNote(a){
@@ -93,10 +93,10 @@ export function mountVoiceApp(host, opts = {}) {
   }
   function applyData(d){
    P.length=0;P.push(...d.products);
-   Object.assign(S,{use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:d.requests,orders:d.orders,tasks:[],live:true,me:d.me,team:d.team,vendors:d.vendors,expired:d.expired});
+   Object.assign(S,{daily:d.daily,use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:d.requests,orders:d.orders,tasks:[],live:true,me:d.me,team:d.team,vendors:d.vendors,expired:d.expired});
    S.rules.adminFinance=d.rules.adminFinance;S.rules.limit=d.rules.limit;
    if(!P.some(p=>p.id===S.pl.sel)){S.pl.sel=P[0]?P[0].id:null;S.pl.used={}}
-   S.notes=S.notes.filter(n=>!n.db).concat(d.alerts.map(alertNote).filter(Boolean));updateBell();
+   S.alerts=d.alerts;S.notes=S.notes.filter(n=>!n.db).concat(d.alerts.map(alertNote).filter(Boolean));updateBell();
   }
   const rehydrate=()=>DB.loadAll().then(d=>{applyData(d);if(S.user)refresh()});
   /* run a database write, then reload the real numbers; on error show it and reload so the screen never lies */
@@ -209,7 +209,7 @@ export function mountVoiceApp(host, opts = {}) {
    }
   }
   track(document,'click',e=>{const b=e.target.closest('[data-pp]');if(b)ppAct(b.dataset.pp)});
-  const costToday=()=>P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
+  const costToday=()=>S.daily?series('cost',1)[0]:P.reduce((a,p)=>a+(S.use[p.id]||0)*p.cost,0);
   const costAvg=()=>S.series.length?S.series.reduce((a,b)=>a+b,0)/S.series.length:0;
   const stockValue=()=>P.reduce((a,p)=>a+p.qty*p.cost,0);
   const pending=()=>S.requests.filter(r=>r.status==='pending');
@@ -681,7 +681,7 @@ export function mountVoiceApp(host, opts = {}) {
 
   /* movements, history, batches (deterministic sample data) */
   function addMove(p,type,q){S.moves.unshift({p:p.id,type,q,t:hhmm(new Date()),who:who()})}
-  function hist(p){let s=[...p.id].reduce((a,c)=>a+c.charCodeAt(0),7);const out=[];for(let i=0;i<13;i++){s=(s*9301+49297)%233280;out.push(r2(p.avg*(.78+.44*s/233280)))}out.push(S.use[p.id]);return out}
+  const hist=p=>series('usage',14,{cat:p.id});
   function batches(p){const a=r2(p.qty*.4),b=r2(p.qty-a),k=p.id.slice(0,2).toUpperCase(),far=p.exp<=3?4:14;
    return [{id:`B-${k}-204`,rec:-3,exp:p.exp,qty:a},{id:`B-${k}-205`,rec:-1,exp:p.exp+far,qty:b}]}
 
@@ -713,12 +713,22 @@ export function mountVoiceApp(host, opts = {}) {
   }
 
 
-  /* cost scene: 7D / 30D, hover tooltips */
-  function seriesN(n){
-   if(n===7)return [...S.series,costToday()];
-   let s=11;const out=[];for(let i=0;i<n-1;i++){s=(s*9301+49297)%233280;out.push(Math.round(345+70*Math.sin(i/3.2)+50*s/233280))}
-   out.push(costToday());return out;
+  /* real daily numbers (database function daily_metrics): metric = cost | usage | waste | stock,
+     n days ending today, shift = days further back (for the 'previous period' line), cat = one product id */
+  function series(metric,n,o={}){
+   const dl=S.daily,today=dl?dl.today:new Date().toLocaleDateString('en-CA'),by={};
+   for(const r of (dl?dl.rows:[])){if(o.cat&&r.p!==o.cat)continue;const a=by[r.d]||(by[r.d]={uq:0,uc:0,wc:0,nc:0});a.uq+=r.uq;a.uc+=r.uc;a.wc+=r.wc;a.nc+=r.nc}
+   const shift=o.shift||0,val={};
+   if(metric==='stock'){/* stock value at the end of each day, rolled back from the value now */
+    let v=o.cat?(prod(o.cat)?prod(o.cat).qty*prod(o.cat).cost:0):stockValue();
+    for(let k=0;k<n+shift+1;k++){const key=DB.addDays(today,-k);val[key]=v;v-=by[key]?by[key].nc:0}
+   }
+   const out=[];
+   for(let i=n-1;i>=0;i--){const key=DB.addDays(today,-(i+shift)),a=by[key]||{uq:0,uc:0,wc:0};
+    out.push(metric==='stock'?Math.max(0,val[key]):metric==='cost'?a.uc:metric==='usage'?a.uq:a.wc)}
+   return out;
   }
+  const seriesN=n=>series('cost',n);
 
 
   /* rules: these settings change how the system behaves */
@@ -790,7 +800,7 @@ export function mountVoiceApp(host, opts = {}) {
   function drawDrawer(){
    const p=prod(S.drawer);if(!p)return;
    const low=p.qty<=p.reorder,tone=itemTone(p),n=pn(p).toLowerCase(),m=ringMetrics(p);
-   const h=hist(p),mx=Math.max(...h)*1.15,W=420,H=90,bw=22,gap=(W-bw*14)/13;
+   const h=hist(p),mx=Math.max(...h,.01)*1.15,W=420,H=90,bw=22,gap=(W-bw*14)/13;
    const bars=h.map((v,i)=>{const bh=v/mx*H,x=i*(bw+gap),d=i===13?L('Today','Hari ini'):dateStr(i-13);return `<rect x="${x}" y="${H-bh}" width="${bw}" height="${bh}" rx="7" fill="${i===13?'var(--accent)':'var(--accent-soft)'}" data-tip="${d}: ${fq(v)} ${U(p.unit)}"/>`}).join('');
    const ay=H-p.avg/mx*H;
    const bt=batches(p).map(b=>`<tr><td>${b.id}</td><td>${dateStr(b.rec)}</td><td><span class="pill ${b.exp<=3?'warn':''}">${dateStr(b.exp)}</span></td><td style="text-align:right">${fq(b.qty)} ${U(p.unit)}</td></tr>`).join('');
@@ -966,6 +976,7 @@ export function mountVoiceApp(host, opts = {}) {
     get isOwner(){return isOwner},get isMgr(){return isMgr},get canFin(){return canFin},get who(){return who},get roleName(){return roleName},
     get clamp(){return clamp},
     get seriesN(){return seriesN},
+    get series(){return series},
     get pn(){return pn},
     get eta(){return eta},
     get esc(){return esc},
