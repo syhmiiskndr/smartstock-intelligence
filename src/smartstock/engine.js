@@ -221,8 +221,15 @@ export function mountVoiceApp(host, opts = {}) {
   const allowed=sc=>(ALLOW[S.role]||[]).includes(sc)||(sc==='cost'&&canFin());
   const who=()=>S.me?S.me.name:'';
   const roleName=r=>r==='owner'?L('Owner','Pemilik'):r==='admin'?'Admin':L('Staff','Staf');
-  const eta=p=>{const h=p.qty/p.avg*24;return h<1?L('under 1 hour','kurang 1 jam'):h<36?Math.round(h)+L(' hours',' jam'):(h/24).toFixed(1)+L(' days',' hari')};
-  const suggest=p=>Math.max(10,Math.round((p.avg*2.5-p.qty)/10)*10);
+  /* days of stock left: the forecast (day by day, weekday-aware) once there is usage history, else balance / average use */
+  const runDays=p=>p.fc&&p.fc.method!=='rules'?(p.fc.days==null?31:p.fc.days):p.qty/p.avg;
+  const eta=p=>{const d=runDays(p),h=d*24;return d>30?L('over 30 days','lebih 30 hari'):h<1?L('under 1 hour','kurang 1 jam'):h<36?Math.round(h)+L(' hours',' jam'):(h/24).toFixed(1)+L(' days',' hari')};
+  /* what the forecast is based on, shown next to every prediction so people know how much to trust it */
+  const aiTag=p=>{const f=p.fc;if(!f)return '';
+   if(f.method==='rules')return L('AI learning: no usage yet, using your reorder level','AI belajar: belum ada penggunaan, guna paras susun semula anda');
+   if(f.dataDays<14)return L(`AI learning: ${f.dataDays} of 14 days of usage`,`AI belajar: ${f.dataDays} daripada 14 hari penggunaan`);
+   return L(`AI forecast: weekday pattern, ${Math.round(f.conf*100)}% confident`,`Ramalan AI: corak hari minggu, yakin ${Math.round(f.conf*100)}%`)};
+  const suggest=p=>p.fc&&p.fc.need&&p.fc.qty>0?p.fc.qty:Math.max(10,Math.round((p.avg*2.5-p.qty)/10)*10);
   /* voice hints use the company's own first two items ({a}, {b}); generic wording when there are none yet */
   const EX={
    ms:{admin:['Buka stok produk','Tunjuk stok rendah','Kenapa kos naik?','Bila {a} habis?','Order 20 kilo {a}','Lulus'],
@@ -240,7 +247,7 @@ export function mountVoiceApp(host, opts = {}) {
   const sayHint=t=>`<span class="say">${L('or say','atau sebut')} <q>${esc(t)}</q></span>`;
   const orderSay=p=>`Order ${suggest(p)} ${uw(p.unit)} ${pn(p).toLowerCase()}`;
   const reqTitle=r=>{const p=prod(r.item),a=`${fq(r.qty)} ${U(p.unit)} ${pn(p)}`;return r.kind==='order'?`Order ${a}`:r.kind==='stockin'?L(`Receive ${a}`,`Terima ${a}`):L(`Write off ${a}`,`Tulis-off ${a}`)};
-  const reqReason=r=>{const p=prod(r.item);return r.rkey==='in'?L('Staff delivery','Penghantaran staf'):r.rkey==='exp'?L('Expired','Luput'):r.rkey==='rep'?L('Reported spoiled','Dilapor rosak'):L('Runs out in ','Habis dalam ')+eta(p)};
+  const reqReason=r=>{const p=prod(r.item);return r.rkey==='in'?L('Staff delivery','Penghantaran staf'):r.rkey==='ai'?L('Forecast: runs out in ','Ramalan: habis dalam ')+eta(p):r.rkey==='exp'?L('Expired','Luput'):r.rkey==='rep'?L('Reported spoiled','Dilapor rosak'):L('Runs out in ','Habis dalam ')+eta(p)};
   const byName=b=>b==='staff'?L('Staff','Staf'):b;
 
   const SCENES={};const missingScene=()=>`<div class="sh"><h1 class="h1">${L("Not available yet","Belum tersedia")}</h1><p class="meta">${L("This page has not been merged into the project yet.","Page ini belum digabungkan ke dalam projek.")}</p></div>`;
@@ -964,6 +971,8 @@ export function mountVoiceApp(host, opts = {}) {
     get esc(){return esc},
     get orderSay(){return orderSay},
     get suggest(){return suggest},
+    get runDays(){return runDays},
+    get aiTag(){return aiTag},
     get U(){return U},
     get fq(){return fq},
     get greet(){return greet},

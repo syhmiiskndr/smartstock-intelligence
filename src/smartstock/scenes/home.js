@@ -1,6 +1,6 @@
 /* Scene "home" – one file per page. Receives the shared engine API and returns its render functions. */
 export default function homeScene(api) {
-  const { S, L, sayHint, examples, ic, ringSet, P, costToday, costAvg, pending, clamp, seriesN, pn, eta, esc, orderSay, suggest, U, fq, greet, rm0, canFin, isOwner, who, stockValue } = api;
+  const { S, L, sayHint, examples, ic, ringSet, P, costToday, costAvg, pending, clamp, seriesN, pn, eta, runDays, aiTag, esc, orderSay, suggest, U, fq, greet, rm0, canFin, isOwner, who, stockValue } = api;
 
   function homeStaff(){
    const done=S.tasks.filter(t=>t.done).length;
@@ -33,10 +33,10 @@ export default function homeScene(api) {
   function rowFor(p,d,ord,used){
    const lead=leadOf(p.sup),handled=!!used[p.id];
    let q;if(!ord||d<=lead)q=Math.max(0,p.qty-p.avg*d);else q=Math.min(p.cap,Math.max(0,p.qty-p.avg*lead)+ord-p.avg*(d-lead));
-   const days0=p.qty/p.avg,daysNow=q/p.avg,expLeft=p.exp-d;
+   const days0=runDays(p),daysNow=d===0?days0:q/p.avg,expLeft=p.exp-d;
    const out=q<=.05,low=!out&&q<=p.reorder,soon=!out&&!low&&daysNow<lead+.5;
    const expiring=!handled&&p.exp<=3&&expLeft>0,expired=!handled&&p.exp<=3&&expLeft<=0;
-   const needsOrder=(p.qty<=p.reorder||days0<lead+.5)&&!ord;
+   const needsOrder=(p.qty<=p.reorder||days0<lead+.5||(p.fc&&p.fc.need&&p.fc.qty>0))&&!ord;
    let pen=0;if(out)pen+=12;else if(!ord){if(low)pen+=10;else if(soon)pen+=2}if(expired)pen+=4;else if(expiring)pen+=3;
    return {p,q,lead,out,low,soon,expiring,expired,daysNow,days0,ord,handled,pen,needsOrder,canUse:p.exp<=3&&!handled};
   }
@@ -109,6 +109,7 @@ export default function homeScene(api) {
     <section class="pl-story" aria-label="${L('Item story','Cerita item')}">
      <div class="pl-sh"><div><div class="pl-kick">${L('The story','Ceritanya')}</div><h2>${pn(p)}</h2></div><span class="pl-chip k-${ck}">${chip}</span></div>
      <p class="pl-p">${story}</p>
+     ${aiTag(p)?`<p class="pl-ai">${esc(aiTag(p))}${p.fc&&p.fc.atRisk>0.05?` · ${L(`about ${fq(p.fc.atRisk)} ${U(p.unit)} may spoil before use`,`kira-kira ${fq(p.fc.atRisk)} ${U(p.unit)} mungkin rosak sebelum guna`)}`:''}</p>`:''}
      <div><div class="pl-rn"><span>${L('Stock runway, 0 to 10 days','Landasan stok, 0 hingga 10 hari')}</span><span>${dtxt(r.daysNow)} ${d===0?L('left now','berbaki sekarang'):L('left at this point','berbaki pada ketika ini')}</span></div>
       <div class="pl-run"><u class="k-${r.out||bad?'bad':r.soon?'warn':'ok'}" style="width:${clamp(r.daysNow/10*100,0,100)}%"></u><s style="left:${r.lead/10*100}%" title="${L('Supplier delivery time','Masa penghantaran pembekal')}"></s><em style="left:calc(${clamp(d/10*100,0,100)}% - 9px)"></em></div>
       <div class="pl-rl"><span><b class="mk"></b>${p.sup} ${L('delivery time','masa hantar')}</span><span><b class="dot"></b>${L('The day you are looking at','Hari yang anda lihat')}</span></div></div>
