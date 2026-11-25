@@ -11,6 +11,7 @@ export const VOICE_ROUTES = {
   fresh: '/fresh',
   ops: '/approvals',
   people: '/people',
+  audit: '/activity',
   rules: '/rules',
   login: '/login',
 };

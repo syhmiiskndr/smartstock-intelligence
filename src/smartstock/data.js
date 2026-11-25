@@ -47,8 +47,11 @@ export async function loadAll() {
   try { await supabase.rpc('refresh_alerts'); } catch (e) { /* ignore */ }
   // forecasts (stock-out days, reorder suggestions, draft purchase orders); throttled in SQL, failures are not fatal
   try { await supabase.rpc('generate_forecasts'); } catch (e) { /* ignore */ }
+  // today's task list (from the stock itself); tasks that no longer apply close themselves
+  try { await supabase.rpc('generate_tasks'); } catch (e) { /* ignore */ }
   const todayISO = new Date().toISOString().slice(0, 10);
-  const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ, forecastsQ, dailyQ] = await Promise.all([
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const [profiles, companies, overview, batches, txs, wastes, settings, vendors, alertsQ, approvalsQ, stockInQ, posQ, expiredQ, forecastsQ, dailyQ, tasksQ] = await Promise.all([
     supabase.from('profiles').select('user_id, full_name, role, company_id, is_active, email'),
     supabase.from('companies').select('*'),
     supabase.from('product_overview').select('*').order('product_name'),
@@ -69,6 +72,7 @@ export async function loadAll() {
       .gt('current_quantity', 0).lt('expiry_date', todayISO),
     supabase.from('forecasts').select('*').not('forecast_date', 'is', null).order('generated_at', { ascending: false }).limit(300),
     supabase.rpc('daily_metrics', { p_days: 120 }),
+    supabase.from('tasks').select('*').or(`status.eq.open,and(status.eq.done,done_at.gte.${startOfToday.toISOString()})`).order('created_at', { ascending: false }).limit(120),
   ]);
   const prof = orThrow(profiles), comp = orThrow(companies), ov = orThrow(overview), bat = orThrow(batches),
     tx = orThrow(txs), ws = orThrow(wastes), vend = orThrow(vendors);
@@ -114,6 +118,14 @@ export async function loadAll() {
     };
   });
   const pid = Object.fromEntries(products.map((p) => [p.dbId, p]));
+
+  // tasks: staff only see tasks meant for everyone or for them
+  const mgr = meRow.role === 'owner' || meRow.role === 'admin';
+  const tasks = (tasksQ.data || [])
+    .filter((t) => mgr || (t.audience !== 'manager' && (!t.assigned_to || t.assigned_to === user.id)))
+    .map((t) => ({ id: String(t.task_id), kind: t.kind, done: t.status === 'done', high: t.priority === 'high', title: t.title, data: t.data || {},
+      p: t.product_id && pid[t.product_id] ? pid[t.product_id].id : null, assignedTo: t.assigned_to, due: t.due_date, by: names[t.done_by] || '' }))
+    .sort((a, b) => (a.done - b.done) || (b.high - a.high));
 
   // recent moves (activity feed)
   const moves = [];
@@ -198,7 +210,7 @@ export async function loadAll() {
   return {
     vendors: vendorsOut, requests, orders, alerts, expired,
     me: { id: user.id, companyId: meRow.company_id, name: meRow.full_name || 'You', role: meRow.role, company: (comp[0] && comp[0].company_name) || '', isDemo: !!(comp[0] && comp[0].is_demo) },
-    products, use, series, moves, waste, daily,
+    products, use, series, moves, waste, daily, tasks,
     rules: { adminFinance: !!st.admin_can_see_finance, limit: num(st.waste_approval_limit) || 50 },
     team: prof.map((p) => ({ id: p.user_id, name: p.full_name || p.email || 'Member', role: p.role, active: p.is_active !== false, email: p.email || '' })),
   };
@@ -245,6 +257,10 @@ export const cancelPO = (id) => rpc('cancel_purchase_order', { p_po: id });
 
 /* ---- stock count and alerts ---- */
 export const adjust = (p, counted, reason) => rpc('adjust_stock', { p_product: p.dbId, p_counted: counted, p_reason: reason || 'stock count' });
+export const completeTask = (id, done) => rpc('complete_task', { p_task: Number(id), p_done: done });
+export const createTask = (v) => rpc('create_task', { p_title: v.title, p_assigned: v.assigned || null, p_due: v.due || null, p_priority: v.priority || 'normal' });
+export const cancelTask = (id) => rpc('cancel_task', { p_task: Number(id) });
+export const auditFeed = (limit, before) => rpc('audit_feed', { p_limit: limit || 60, p_before: before || null });
 export const ackAlerts = (ids) => ids.length ? rpc('acknowledge_alerts', { p_ids: ids }) : Promise.resolve(0);
 
 /* ---- edit items and suppliers (owner/admin; RLS enforces it) ---- */

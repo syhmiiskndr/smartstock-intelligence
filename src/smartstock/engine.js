@@ -81,7 +81,7 @@ export function mountVoiceApp(host, opts = {}) {
   /* clear everything that belongs to the signed-in company (used on sign-out) */
   function clearData(){
    P.length=0;Object.assign(S,{daily:null,use:{},series:[],requests:[],waste:[],tasks:[],moves:[],orders:[],live:false,me:null,team:null,vendors:null,expired:null,authMode:null});
-   S.notes=[];S.rules.adminFinance=false;S.pl.sel=null;S.pl.used={};
+   S.notes=[];S.rules.adminFinance=false;S.auditV=null;S.pl.sel=null;S.pl.used={};
   }
   function alertNote(a){
    const p=prod(a.pid);if(!p)return null;const n=pn(p),t=new Date(a.t);
@@ -93,7 +93,7 @@ export function mountVoiceApp(host, opts = {}) {
   }
   function applyData(d){
    P.length=0;P.push(...d.products);
-   Object.assign(S,{daily:d.daily,use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:d.requests,orders:d.orders,tasks:[],live:true,me:d.me,team:d.team,vendors:d.vendors,expired:d.expired});
+   Object.assign(S,{daily:d.daily,use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:d.requests,orders:d.orders,tasks:d.tasks||[],live:true,me:d.me,team:d.team,vendors:d.vendors,expired:d.expired});
    S.rules.adminFinance=d.rules.adminFinance;S.rules.limit=d.rules.limit;
    if(!P.some(p=>p.id===S.pl.sel)){S.pl.sel=P[0]?P[0].id:null;S.pl.used={}}
    S.alerts=d.alerts;S.notes=S.notes.filter(n=>!n.db).concat(d.alerts.map(alertNote).filter(Boolean));updateBell();
@@ -122,6 +122,19 @@ export function mountVoiceApp(host, opts = {}) {
    return Promise.resolve(pr).then(rehydrate).then(()=>{hidePanel();notify('ok',msg,'')}).catch(e=>{
     const m=String(e&&e.message||e);if($('#fm-err'))fmErr(m);else notify('bad',L('Not saved','Tidak disimpan'),m)});
   }
+  /* one line of text per task, in the current language; automatic tasks are built from their data */
+  function taskText(t){
+   const p=t.p&&prod(t.p),n=p?pn(p):'',u=p?U(p.unit):'',d=t.data||{},q=x=>fq(Number(x)||0);
+   switch(t.kind){
+    case 'use_first':return L(`Use ${n} first: ${q(d.qty)} ${u} ${d.days<=0?'expires today':'expires in '+d.days+' day'+(d.days===1?'':'s')}`,`Guna ${n} dahulu: ${q(d.qty)} ${u} ${d.days<=0?'luput hari ini':'luput dalam '+d.days+' hari'}`);
+    case 'spoil':return L(`Move or promote ${n}: about ${q(d.qty)} ${u} may spoil`,`Gerak atau promosi ${n}: kira-kira ${q(d.qty)} ${u} mungkin rosak`);
+    case 'low':return L(`Check ${n}: ${q(d.qty)} ${u} left (reorder level ${q(d.level)})`,`Semak ${n}: tinggal ${q(d.qty)} ${u} (paras susun semula ${q(d.level)})`);
+    case 'receive':return L(`Receive delivery PO #${d.po}${d.vendor?' from '+d.vendor:''}${d.late>0?` (${d.late} day${d.late===1?'':'s'} late)`:''}`,`Terima penghantaran PO #${d.po}${d.vendor?' daripada '+d.vendor:''}${d.late>0?` (lewat ${d.late} hari)`:''}`);
+    case 'expired':return L(`Remove expired ${n} (${q(d.qty)} ${u})`,`Buang ${n} yang luput (${q(d.qty)} ${u})`);
+    case 'review':return L(`Review ${d.n} approval${d.n===1?'':'s'} waiting`,`Semak ${d.n} kelulusan menunggu`);
+    default:return t.title;
+   }
+  }
   function ppAct(a){
    if(!S.live)return;
    const [k,arg]=a.split(':'),own=isOwner(),mgr=isMgr();
@@ -130,6 +143,18 @@ export function mountVoiceApp(host, opts = {}) {
    }else if(k==='resetdemo'&&own){
     panel({state:L('Reset','Reset'),tone:'warn',title:L('Reset demo data?','Reset data demo?'),body:L('All stock, orders and history in this demo company are deleted and the sample data is loaded again.','Semua stok, order dan sejarah dalam syarikat demo ini dipadam dan data contoh dimuat semula.'),persist:true,
      actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Reset','Reset'),kind:'ok',fn:()=>ppDone(DB.resetDemo(),L('Demo data reset','Data demo di-reset'))}]});
+   }else if(k==='addtask'&&mgr){
+    const people=(S.team||[]).filter(m=>m.active);
+    fmPanel({state:L('New task','Tugas baru'),title:L('Add a task','Tambah tugas'),cta:L('Add','Tambah'),done:L('Task added','Tugas ditambah'),
+     html:FM('title',L('What needs doing?','Apa yang perlu dibuat?'),'text',L('Wipe the display shelves','Lap rak paparan'))
+      +FMS('who',L('For','Untuk'),[['',L('Everyone','Semua orang')],...people.map(m=>[m.id,m.name])],'')
+      +FMS('prio',L('Priority','Keutamaan'),[['normal',L('Normal','Biasa')],['high',L('High','Tinggi')]],'normal')
+      +FM('due',L('Due date (optional)','Tarikh akhir (pilihan)'),'date'),
+     check:v=>v.title?'':L('Enter the task.','Masukkan tugas.'),run:v=>DB.createTask({title:v.title,assigned:v.who,priority:v.prio,due:v.due})});
+   }else if(k==='deltask'&&mgr){
+    const t=S.tasks.find(x=>x.id===arg);if(!t)return;
+    panel({state:L('Remove','Buang'),title:L('Remove this task?','Buang tugas ini?'),body:t.title,persist:true,
+     actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Remove','Buang'),kind:'ok',fn:()=>ppDone(DB.cancelTask(t.id),L('Task removed','Tugas dibuang'))}]});
    }else if(k==='invite'&&mgr){
     const mk=role=>DB.createInvite(role).then(code=>panel({state:L('Invite','Jemputan'),title:L('Invite code','Kod jemputan'),big:code,
       body:L('Share this code. It works once and expires in 7 days. They register on the login page, choose "Join with code" and enter it.','Kongsi kod ini. Ia sah sekali sahaja dan tamat dalam 7 hari. Mereka daftar di halaman log masuk, pilih "Sertai dengan kod" dan masukkan kod ini.'),
@@ -217,7 +242,7 @@ export function mountVoiceApp(host, opts = {}) {
   const isOwner=()=>S.role==='owner';
   const isMgr=()=>S.role==='owner'||S.role==='admin';
   const canFin=()=>S.role==='owner'||(S.role==='admin'&&!!S.rules.adminFinance);
-  const ALLOW={owner:['home','analytics','stock','cost','fresh','ops','people','rules'],admin:['home','stock','fresh','ops','people'],staff:['home','stock','fresh']};
+  const ALLOW={owner:['home','analytics','stock','cost','fresh','ops','people','audit','rules'],admin:['home','stock','fresh','ops','people','audit'],staff:['home','stock','fresh']};
   const allowed=sc=>(ALLOW[S.role]||[]).includes(sc)||(sc==='cost'&&canFin());
   const who=()=>S.me?S.me.name:'';
   const roleName=r=>r==='owner'?L('Owner','Pemilik'):r==='admin'?'Admin':L('Staff','Staf');
@@ -303,7 +328,7 @@ export function mountVoiceApp(host, opts = {}) {
   }
   function plToast(msg){S.pl.toast=msg;clearTimeout(plTt);plTt=setTimeout(()=>{S.pl.toast='';plPatch()},2600)}
   function pulseOrder(id){const p=prod(id);if(!p||S.orders.some(o=>o.item===id&&!o.done))return false;newPO({item:id,qty:suggest(p)});log(orderSay(p),L('Order','Order'),L('Done','Dilaksana'));return true}
-  function pulseUse(id){const p=prod(id);if(!p||S.pl.used[id])return false;S.pl.used[id]=true;S.tasks.unshift({id:'use-'+id,en:`Use ${p.en||p.name} first`,ms:`Guna ${p.name} dahulu`,done:false,key:'use:'+id});log(`Use ${p.en||p.name} first`,L('Use first','Guna dahulu'),L('Done','Dilaksana'));return true}
+  function pulseUse(id){const p=prod(id);if(!p||S.pl.used[id])return false;S.pl.used[id]=true;log(`Use ${p.en||p.name} first`,L('Use first','Guna dahulu'),L('Done','Dilaksana'));return true}
   function plAct(k,id,el){
    const PL=S.pl;
    if(k==='sel')PL.sel=id;
@@ -321,7 +346,16 @@ export function mountVoiceApp(host, opts = {}) {
   }
   function go(scene){
    if(!allowed(scene))return deny();
-   S.scene=scene;closeMenu();render(true);if(opts.onNavigate)opts.onNavigate(scene);
+   S.scene=scene;closeMenu();if(scene==='audit'&&S.live)loadAudit(true);render(true);if(opts.onNavigate)opts.onNavigate(scene);
+  }
+  /* activity log: manager-only feed from the database, loaded 60 at a time */
+  function loadAudit(reset){
+   const A=S.auditV||(S.auditV={rows:[],more:true,loading:false,filter:'all',err:''});
+   if(reset){A.rows=[];A.more=true;A.err=''}
+   if(A.loading||!A.more)return;
+   A.loading=true;if(S.scene==='audit')refresh();
+   const last=A.rows.length?A.rows[A.rows.length-1].at:null;
+   DB.auditFeed(60,last).then(rows=>{A.rows=A.rows.concat(rows);A.more=rows.length>=60}).catch(e=>{A.err=String(e&&e.message||e);A.more=false}).finally(()=>{A.loading=false;if(S.scene==='audit')refresh()});
   }
   function deny(){
    panel({state:L('No access','Tiada akses'),tone:'bad',title:(S.role==='staff'?L('This screen is for admins only.','Skrin ini untuk admin sahaja.'):L('This screen needs the owner or a finance permission.','Skrin ini perlukan pemilik atau kebenaran kewangan.')),chips:[{label:L('Open stock','Buka stok'),say:L('Open stock','Buka stok')}],ttl:5000});
@@ -346,7 +380,7 @@ export function mountVoiceApp(host, opts = {}) {
   });
 
   /* petals */
-  const NAVALL=[['home','Home','Utama','home'],['analytics','Analytics','Analitik','trend'],['stock','Stock','Stok','box'],['cost','Cost','Kos','coin'],['fresh','Fresh','Segar','leaf'],['ops','Approve','Lulus','check'],['people','People','Orang','users'],['rules','Rules','Tetapan','sliders']];
+  const NAVALL=[['home','Home','Utama','home'],['analytics','Analytics','Analitik','trend'],['stock','Stock','Stok','box'],['cost','Cost','Kos','coin'],['fresh','Fresh','Segar','leaf'],['ops','Approve','Lulus','check'],['people','People','Orang','users'],['audit','Activity','Aktiviti','clock'],['rules','Rules','Tetapan','sliders']];
   const navList=()=>NAVALL.filter(n=>allowed(n[0]));
 
   function openMenu(){closeCmd();$('#petals').classList.add('open');$('#scrim').hidden=false;$('#b-menu').setAttribute('aria-pressed','true')}
@@ -518,7 +552,7 @@ export function mountVoiceApp(host, opts = {}) {
    panel({state:lvl||L('Confirm','Sahkan'),tone:lvl?'warn':'',said:d.said,title:VERB()[d.type]+' '+pn(p).toLowerCase(),big:`${sign}${fq(q)} ${U(p.unit)}`,facts,
     actions:[{label:L('Redo','Ulang'),fn:()=>{S.draft=null;hidePanel()}},{label:d.type==='order'&&S.role==='staff'?L('Send to admin','Hantar kepada admin'):L('Confirm','Betul'),kind:'ok',fn:commit}],bigBtn:true,persist:true,html:`<span class="say" style="margin-top:12px">${L('or say','atau sebut')} <q>${L('confirm','betul')}</q></span>`});
   }
-  function tick(key){const t=S.tasks.find(x=>x.key===key&&!x.done);if(t)t.done=true}
+  function tick(){} /* tasks close themselves on the server once the stock situation changes (generate_tasks) */
   function commit(){
    const d=S.draft;if(!d)return;S.draft=null;const p=prod(d.item),q=d.qty,amt=q*p.cost,before=p.qty,n=pn(p).toLowerCase();
    if(d.type==='usage'){
@@ -613,8 +647,10 @@ export function mountVoiceApp(host, opts = {}) {
    if(b=t.closest('#stage [data-say]'))return speakSim(b.dataset.say);
    if(b=t.closest('#stage [data-go]'))return go(b.dataset.go);
    if(b=t.closest('#stage [data-filter]')){S.filter=b.dataset.filter;return refresh()}
+   if(b=t.closest('#stage [data-afilter]')){if(S.auditV)S.auditV.filter=b.dataset.afilter;return refresh()}
+   if(b=t.closest('#stage [data-amore]'))return loadAudit(false);
    if(b=t.closest('#stage [data-jar]'))return openDetail(b.dataset.jar);
-   if(b=t.closest('#stage [data-task]')){const k=S.tasks.find(x=>x.id===b.dataset.task);k.done=!k.done;return refresh()}
+   if(b=t.closest('#stage [data-task]')){const k=S.tasks.find(x=>x.id===b.dataset.task);if(!k)return;k.done=!k.done;refresh();return dbw(()=>DB.completeTask(k.id,k.done))}
    if(b=t.closest('#stage [data-tile]'))return startDraft(b.dataset.tile,null,null,null,'');
    if(b=t.closest('#stage [data-scan]'))return scan();
    if(b=t.closest('#stage [data-decide]')){const ok=b.dataset.decide==='ok';log(L('(button)','(butang)'),ok?L('Approve','Lulus'):L('Reject','Tolak'),L('Done','Dilaksana'));return decide(ok)}
@@ -818,7 +854,7 @@ export function mountVoiceApp(host, opts = {}) {
   }
 
   /* dock (replaces the sidebar) with macOS-style magnification */
-  const DKG={home:['#5AC8FA','#007AFF'],analytics:['#FF8AD8','#E5359B'],stock:['#FFB340','#FF7A00'],cost:['#4CD964','#1FAE4B'],fresh:['#5EE0D0','#14A7B8'],ops:['#FF6B5E','#E5243B'],people:['#C98BF5','#8B3FD1'],rules:['#A8A8B0','#6B6B73']};
+  const DKG={home:['#5AC8FA','#007AFF'],analytics:['#FF8AD8','#E5359B'],stock:['#FFB340','#FF7A00'],cost:['#4CD964','#1FAE4B'],fresh:['#5EE0D0','#14A7B8'],ops:['#FF6B5E','#E5243B'],people:['#C98BF5','#8B3FD1'],audit:['#7D8CFF','#4A4FD6'],rules:['#A8A8B0','#6B6B73']};
   function renderPetals(){
    const di=$('#dockitems'),keep=di.scrollLeft;
    di.innerHTML=navList().map(([id,en,ms,icon])=>{const g=DKG[id],b=id==='ops'&&pending().length?`<u>${pending().length}</u>`:'';
@@ -982,6 +1018,7 @@ export function mountVoiceApp(host, opts = {}) {
     get esc(){return esc},
     get orderSay(){return orderSay},
     get suggest(){return suggest},
+    get taskText(){return taskText},
     get runDays(){return runDays},
     get aiTag(){return aiTag},
     get U(){return U},
