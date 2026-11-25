@@ -4,6 +4,7 @@
 import './voice.css';
 import MARKUP from './markup.js';
 import * as DB from './data.js';
+import { aiConfigured, inspectPhoto, toScanResult } from './aiClient.js';
 
 const sceneModules = import.meta.glob('./scenes/*.js', { eager: true });
 const store = (globalThis.__smartstockVoice ||= {}); // keeps data and state while you move between pages
@@ -486,7 +487,7 @@ export function mountVoiceApp(host, opts = {}) {
      if(!allowed(sc)){log(text,L('Open ','Buka ')+navName(sc),L('Not allowed','Tidak dibenarkan'));return deny()}
      log(text,L('Open ','Buka ')+navName(sc),L('Navigated','Navigasi'));if(sc==='stock')S.filter='all';
      const auto=sc==='fresh'&&/\b(imbas|scan)\b/.test(t);
-     go(sc);if(auto)setTimeout(scan,900);return;
+     go(sc);if(auto)setTimeout(()=>scan(true),900);return;
     }
    }
    if(item){log(text,L('Item details','Butiran item'),L('Navigated','Navigasi'));S.filter='all';go('stock');return setTimeout(()=>openDetail(item),500)}
@@ -576,9 +577,40 @@ export function mountVoiceApp(host, opts = {}) {
    el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
   }
 
-  /* freshness scan (placeholder until the YOLOv4 service is connected) */
-  function scan(){
-   panel({state:L('Coming soon','Akan datang'),tone:'warn',title:L('Freshness model not connected yet.','Model kesegaran belum disambung.'),body:L('The YOLOv4 service will be plugged in here.','Perkhidmatan YOLOv4 akan disambung di sini.')});
+  /* freshness scan: sends a photo to the AI service (ai/service). Without VITE_AI_SERVICE_URL it shows "coming soon". */
+  const MS_FRUIT={banana:'pisang',apple:'epal',orange:'oren'};
+  const photoInput=document.createElement('input');
+  photoInput.type='file';photoInput.accept='image/*';photoInput.setAttribute('capture','environment');photoInput.hidden=true;
+  root.appendChild(photoInput);
+  photoInput.addEventListener('change',async()=>{
+   const f=photoInput.files&&photoInput.files[0];photoInput.value='';
+   if(!f)return;
+   const F=S.fresh;
+   if(F.shot)URL.revokeObjectURL(F.shot);
+   F.shot=URL.createObjectURL(F.shotFile=f);F.res=null;F.scanning=true;refresh();
+   try{
+    const out=toScanResult(await inspectPhoto(f));
+    F.scanning=false;F.res=out;refresh();
+    if(!out)panel({state:L('Check','Semak'),tone:'warn',title:L('No fruit found in the photo.','Tiada buah dijumpai dalam gambar.'),body:L('Try again with the fruit filling the frame.','Cuba lagi dengan buah memenuhi bingkai.')});
+   }catch(e){
+    F.scanning=false;F.res=null;refresh();
+    const net=e.kind==='network'||e.kind==='timeout';
+    panel({state:L('Scan failed','Imbasan gagal'),tone:'bad',
+     title:net?L('Cannot reach the AI service.','Tidak dapat hubungi perkhidmatan AI.'):L('The AI service could not read this photo.','Perkhidmatan AI tidak dapat baca gambar ini.'),
+     body:net?L('Check that the service is running and try again.','Pastikan perkhidmatan berjalan dan cuba lagi.'):(e.message||''),ttl:9000});
+   }
+  });
+  function scan(auto){
+   if(!aiConfigured){
+    panel({state:L('Coming soon','Akan datang'),tone:'warn',title:L('Freshness model not connected yet.','Model kesegaran belum disambung.'),body:L('The AI service address is not set (VITE_AI_SERVICE_URL).','Alamat perkhidmatan AI belum ditetapkan (VITE_AI_SERVICE_URL).')});
+    return;
+   }
+   if(S.fresh.scanning)return;
+   if(auto){ // a browser only opens the camera after a real tap, not after a voice command
+    panel({state:L('Ready','Sedia'),tone:'ok',title:L('Tap the round button to take the photo.','Tekan butang bulat untuk ambil gambar.'),ttl:6000});
+    return;
+   }
+   photoInput.click();
   }
 
   /* detail sheet for a jar */
@@ -966,6 +998,7 @@ export function mountVoiceApp(host, opts = {}) {
     get S(){return S},
     get L(){return L},
     get sayHint(){return sayHint},
+    get aiOn(){return aiConfigured},
     get examples(){return examples},
     get ic(){return ic},
     get ringSet(){return ringSet},
