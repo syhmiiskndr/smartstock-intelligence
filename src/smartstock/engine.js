@@ -74,14 +74,14 @@ export function mountVoiceApp(host, opts = {}) {
    audit:[],fresh:{res:null,scanning:false,n:0},rid:1
   };
   S.notes=[];S.range=7;S.orders=[];S.user=null;S.drawer=null;S.live=false;S.me=null;S.team=null;S.vendors=null;S.expired=null;
-  S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false};
+  S.rules={lowAlert:true,expAlert:true,anomaly:true,confirm:true,limit:15,adminFinance:false,autonomy:'draft',autoLimit:100,autoCap:500,expDays:3};
   return S})());
   if(!S.an)S.an={metric:'cost',range:30,cmp:true,fc:true,cat:null};
   if(!S.pl)S.pl={sel:null,day:0,used:{},filter:null,playing:false,shown:0,toast:''};
   /* clear everything that belongs to the signed-in company (used on sign-out) */
   function clearData(){
    P.length=0;Object.assign(S,{daily:null,use:{},series:[],requests:[],waste:[],tasks:[],moves:[],orders:[],live:false,me:null,team:null,vendors:null,expired:null,authMode:null});
-   S.notes=[];S.rules.adminFinance=false;S.auditV=null;S.pl.sel=null;S.pl.used={};
+   S.notes=[];Object.assign(S.rules,{adminFinance:false,limit:15,autonomy:'draft',autoLimit:100,autoCap:500,expDays:3,lowAlert:true,expAlert:true,anomaly:true,confirm:true});S.auditV=null;S.pl.sel=null;S.pl.used={};
   }
   function alertNote(a){
    const p=prod(a.pid);if(!p)return null;const n=pn(p),t=new Date(a.t);
@@ -94,7 +94,7 @@ export function mountVoiceApp(host, opts = {}) {
   function applyData(d){
    P.length=0;P.push(...d.products);
    Object.assign(S,{daily:d.daily,use:d.use,series:d.series,moves:d.moves,waste:d.waste,requests:d.requests,orders:d.orders,tasks:d.tasks||[],live:true,me:d.me,team:d.team,vendors:d.vendors,expired:d.expired});
-   S.rules.adminFinance=d.rules.adminFinance;S.rules.limit=d.rules.limit;
+   Object.assign(S.rules,d.rules);
    if(!P.some(p=>p.id===S.pl.sel)){S.pl.sel=P[0]?P[0].id:null;S.pl.used={}}
    S.alerts=d.alerts;S.notes=S.notes.filter(n=>!n.db).concat(d.alerts.map(alertNote).filter(Boolean));updateBell();
   }
@@ -767,7 +767,25 @@ export function mountVoiceApp(host, opts = {}) {
   const seriesN=n=>series('cost',n);
 
 
-  /* rules: these settings change how the system behaves */
+  /* rules: these settings change how the system behaves. Saved to the database (owner only); local only in the offline demo */
+  const RKEY={lowAlert:'low_alert',expAlert:'expiry_alert',anomaly:'flag_anomaly',confirm:'confirm_voice',limit:'waste_approval_limit',adminFinance:'admin_can_see_finance',
+   expDays:'expiring_soon_days',autonomy:'autonomy',autoLimit:'auto_order_limit',autoCap:'auto_order_daily_cap'};
+  function setRule(patch){
+   const before={};Object.keys(patch).forEach(k=>{before[k]=S.rules[k]});Object.assign(S.rules,patch);
+   if(!S.live)return refresh();
+   const db={};Object.keys(patch).forEach(k=>{db[RKEY[k]]=patch[k]});
+   return dbw(()=>DB.updateSettings(db).catch(err=>{Object.assign(S.rules,before);throw err}));
+  }
+  function pickAutonomy(v){
+   if(v===S.rules.autonomy)return;
+   if(v!=='auto')return setRule({autonomy:v});
+   const R=S.rules;
+   panel({state:L('Auto-order','Auto-order'),title:L('Let SmartStock place orders?','Benarkan SmartStock buat order?'),persist:true,
+    body:L(`SmartStock will place purchase orders by itself when each order is RM ${R.autoLimit} or less and the day's total stays within RM ${R.autoCap}. Drafts already waiting inside those limits are ordered now. Bigger orders still wait for your approval. You can change this any time.`,
+      `SmartStock akan membuat pesanan sendiri bila setiap order RM ${R.autoLimit} atau kurang dan jumlah sehari tidak melebihi RM ${R.autoCap}. Draf yang sedang menunggu dalam had ini akan dipesan sekarang. Order lebih besar tetap menunggu kelulusan anda. Anda boleh tukar bila-bila masa.`),
+    actions:[{label:L('Cancel','Batal'),fn:hidePanel},{label:L('Turn on auto-order','Hidupkan auto-order'),kind:'ok',fn:()=>{hidePanel();setRule({autonomy:'auto'})}}]});
+  }
+
 
 
 
@@ -782,9 +800,13 @@ export function mountVoiceApp(host, opts = {}) {
    if(b=e.target.closest('#stage [data-an-range]')){S.an.range=+b.dataset.anRange;refresh()}
    if(b=e.target.closest('#stage [data-an-toggle]')){const k=b.dataset.anToggle;S.an[k]=!S.an[k];refresh()}
    if(b=e.target.closest('#stage [data-an-cat]')){const c=b.dataset.anCat;S.an.cat=S.an.cat===c?null:c;refresh()}
-   if(b=e.target.closest('#stage [data-rule]')){const k=b.dataset.rule;S.rules[k]=!S.rules[k];b.setAttribute('aria-checked',S.rules[k])}
+   if(b=e.target.closest('#stage [data-rule]')){const k=b.dataset.rule;b.setAttribute('aria-checked',!S.rules[k]);setRule({[k]:!S.rules[k]})}
+   if(b=e.target.closest('#stage [data-autonomy]'))pickAutonomy(b.dataset.autonomy);
   });
-  track(document,'input',e=>{if(e.target.id==='limit'){S.rules.limit=+e.target.value;$('#limit-v').textContent='RM '+S.rules.limit}});
+  /* sliders move the number while dragging and save when released */
+  const SLIDERS={limit:'limit',autolimit:'autoLimit',autocap:'autoCap'};
+  track(document,'input',e=>{const k=SLIDERS[e.target.id];if(k){const v=$('#'+e.target.id+'-v');if(v)v.textContent='RM '+e.target.value}});
+  track(document,'change',e=>{const id=e.target.id,k=SLIDERS[id];if(k)setRule({[k]:+e.target.value});else if(id==='expdays')setRule({expDays:+e.target.value})});
 
   /* login, account, chrome */
 

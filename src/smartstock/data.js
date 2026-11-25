@@ -211,7 +211,12 @@ export async function loadAll() {
     vendors: vendorsOut, requests, orders, alerts, expired,
     me: { id: user.id, companyId: meRow.company_id, name: meRow.full_name || 'You', role: meRow.role, company: (comp[0] && comp[0].company_name) || '', isDemo: !!(comp[0] && comp[0].is_demo) },
     products, use, series, moves, waste, daily, tasks,
-    rules: { adminFinance: !!st.admin_can_see_finance, limit: num(st.waste_approval_limit) || 50 },
+    rules: {
+      adminFinance: !!st.admin_can_see_finance, limit: num(st.waste_approval_limit) || 50,
+      autonomy: st.autonomy || 'draft', autoLimit: st.auto_order_limit == null ? 100 : num(st.auto_order_limit),
+      autoCap: st.auto_order_daily_cap == null ? 500 : num(st.auto_order_daily_cap), expDays: num(st.expiring_soon_days) || 3,
+      lowAlert: st.low_alert !== false, expAlert: st.expiry_alert !== false, anomaly: st.flag_anomaly !== false, confirm: st.confirm_voice !== false,
+    },
     team: prof.map((p) => ({ id: p.user_id, name: p.full_name || p.email || 'Member', role: p.role, active: p.is_active !== false, email: p.email || '' })),
   };
 }
@@ -257,6 +262,8 @@ export const cancelPO = (id) => rpc('cancel_purchase_order', { p_po: id });
 
 /* ---- stock count and alerts ---- */
 export const adjust = (p, counted, reason) => rpc('adjust_stock', { p_product: p.dbId, p_counted: counted, p_reason: reason || 'stock count' });
+/* owner only; keys are the database column names, e.g. { autonomy: 'auto', auto_order_limit: 150 } */
+export const updateSettings = (patch) => rpc('update_settings', { p_patch: patch });
 export const completeTask = (id, done) => rpc('complete_task', { p_task: Number(id), p_done: done });
 export const createTask = (v) => rpc('create_task', { p_title: v.title, p_assigned: v.assigned || null, p_due: v.due || null, p_priority: v.priority || 'normal' });
 export const cancelTask = (id) => rpc('cancel_task', { p_task: Number(id) });
