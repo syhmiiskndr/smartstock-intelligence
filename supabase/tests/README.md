@@ -7,3 +7,5 @@ Order used locally: 00 stub, 0002, 0004, 0003 (after inserting owner/admin/staff
 `0006_forecast_engine.sql` runs after 0005; `04_forecast.sql` checks the learning ladder (rules/average/trend/weekday), stock-out days,
 spoilage risk, draft purchase orders (no duplicates, approve/reject, no vendor, staff cannot approve) and company isolation.
 `0007_daily_metrics.sql` runs after 0006; `05_metrics.sql` checks that the daily numbers behind every chart add up to the raw transactions.
+`0008_tasks_and_audit.sql` runs after 0007; `06_tasks_audit.sql` checks task generation (no duplicates, auto-close), who may complete / create / cancel
+tasks (writes only through functions), the manager-only activity feed (stock, changes with old/new values, completed tasks, paging) and company isolation.

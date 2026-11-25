@@ -1,9 +1,17 @@
 /* Scene "home" – one file per page. Receives the shared engine API and returns its render functions. */
 export default function homeScene(api) {
-  const { S, L, sayHint, examples, ic, ringSet, P, costToday, costAvg, pending, clamp, seriesN, series, pn, eta, runDays, aiTag, esc, orderSay, suggest, U, fq, greet, rm0, canFin, isOwner, who, stockValue } = api;
+  const { S, L, sayHint, examples, ic, ringSet, P, costToday, costAvg, pending, clamp, seriesN, series, pn, eta, runDays, aiTag, esc, orderSay, suggest, U, fq, greet, rm0, canFin, isOwner, who, stockValue, taskText } = api;
+
+  /* real tasks from the database: open first, high priority marked; managers can add and remove manual tasks */
+  function taskList(){
+   const T=S.tasks,mgr=S.role!=='staff',shown=T.slice(0,10),done=T.filter(t=>t.done).length;
+   const row=t=>{const x=`<button class="task ${t.done?'done':''}" data-task="${t.id}"><i>${ic('check',14)}</i><span>${t.high&&!t.done?`<b class="hi" title="${L('Important','Penting')}">!</b>`:''}${esc(taskText(t))}${t.due&&!t.done?`<small>${L('Due','Tarikh')} ${esc(t.due)}</small>`:''}</span></button>`;
+    return mgr&&t.kind==='manual'?`<div class="task-wrap">${x}<button class="task-x" data-pp="deltask:${t.id}" aria-label="${L('Remove task','Buang tugas')}">${ic('x',14)}</button></div>`:x;};
+   return `<h2 class="h2">${L("Today's tasks",'Tugas hari ini')} <span class="pill ${T.length&&done===T.length?'ok':''}" style="vertical-align:middle">${done}/${T.length}</span>${mgr?` <button class="btn" style="margin-left:10px" data-pp="addtask">${L('Add task','Tambah tugas')}</button>`:''}</h2>
+   <div class="tasks">${shown.length?shown.map(row).join(''):`<p class="meta">${L('No tasks right now. They appear when stock needs attention.','Tiada tugas sekarang. Ia muncul bila stok perlukan perhatian.')}</p>`}${T.length>shown.length?`<p class="meta">+${T.length-shown.length} ${L('more','lagi')}</p>`:''}</div>`;
+  }
 
   function homeStaff(){
-   const done=S.tasks.filter(t=>t.done).length;
    return `<div class="staff"><h1 class="h1">${L('Just say it.','Cakap je.')}</h1>
    <p class="meta" style="margin-top:10px">${L('Tap the orb and say what you did.','Tekan orb, sebut apa yang anda buat.')}${sayHint(examples()[0])}</p>
    <div class="tiles">
@@ -12,8 +20,7 @@ export default function homeScene(api) {
     <button class="tile" data-go="fresh"><span class="ico" style="background:linear-gradient(150deg,#64D2FF,#0A84FF)">${ic('leaf',24)}</span>${L('Check freshness','Semak segar')}</button>
     <button class="tile" data-tile="waste"><span class="ico" style="background:linear-gradient(150deg,#FF6B5E,#D70015)">${ic('trash',24)}</span>${L('Report waste','Lapor rosak')}</button>
    </div>
-   <h2 class="h2">${L("Today's tasks",'Tugas hari ini')} <span class="pill ${done===3?'ok':''}" style="vertical-align:middle">${done}/3</span></h2>
-   <div class="tasks">${S.tasks.map(t=>`<button class="task ${t.done?'done':''}" data-task="${t.id}"><i>${ic('check',14)}</i>${L(t.en,t.ms)}</button>`).join('')}</div></div>`;
+   ${taskList()}</div>`;
   }
 
   /* ---- Business Pulse: the shared home for owner and admin ----
@@ -55,7 +62,7 @@ export default function homeScene(api) {
    const stockPct=Math.round((rows.length-lowN)/rows.length*100),freshPct=Math.round(freshN/rows.length*100);
    const doneT=S.tasks.filter(t=>t.done).length,pct=costAvg()>0?Math.round((costToday()/costAvg()-1)*100):0;
    const pillar=(k,name,val,col,pick)=>`<${pick?'button':'div'} class="pl-pillar ${PL.filter===k?'on':''}" style="--pc:${col}" ${pick?`data-pl="filter" data-id="${k}" aria-pressed="${PL.filter===k}"`:''}><span>${name}</span><b>${val}%</b><i><u style="width:${val}%"></u></i></${pick?'button':'div'}>`;
-   const pillars=pillar('stock',L('Stock levels','Paras stok'),stockPct,'var(--r-stock)',1)+pillar('fresh',L('Freshness','Kesegaran'),freshPct,'var(--r-fresh)',1)+(own?pillar('cost',L('Cost control (see Analytics)','Kawalan kos (lihat Analitik)'),clamp(100-Math.max(0,pct),0,100),'var(--r-cover)',0):pillar('tasks',L(`Team tasks (${doneT} of ${S.tasks.length} done)`,`Tugas pasukan (${doneT} daripada ${S.tasks.length} siap)`),Math.round(doneT/S.tasks.length*100),'#AF52DE',0));
+   const pillars=pillar('stock',L('Stock levels','Paras stok'),stockPct,'var(--r-stock)',1)+pillar('fresh',L('Freshness','Kesegaran'),freshPct,'var(--r-fresh)',1)+(own?pillar('cost',L('Cost control (see Analytics)','Kawalan kos (lihat Analitik)'),clamp(100-Math.max(0,pct),0,100),'var(--r-cover)',0):pillar('tasks',L(`Team tasks (${doneT} of ${S.tasks.length} done)`,`Tugas pasukan (${doneT} daripada ${S.tasks.length} siap)`),S.tasks.length?Math.round(doneT/S.tasks.length*100):100,'#AF52DE',0));
    const tiles=rows.map(r=>{const p=r.p,fill=clamp(r.q/p.cap*100,3,100),bad=r.out||r.low,warn=!bad&&(r.soon||r.expiring||r.expired),k=bad?'bad':warn?'warn':'ok';
     const dim=(PL.filter==='stock'&&!(bad||r.soon))||(PL.filter==='fresh'&&!(r.expiring||r.expired));
     const big=r.out?L('Out','Habis'):r.daysNow<1?Math.max(1,Math.round(r.daysNow*24))+L('h','j'):nf(r.daysNow)+L('d','h');
@@ -77,7 +84,7 @@ export default function homeScene(api) {
      +kp(L('Waste this week','Sisa minggu ini'),rm0(waste),series('waste',7),L('Actual, this week','Sebenar, minggu ini'),waste>30?'warn':'ok','var(--ok)')
      +kp(L('Approvals waiting','Kelulusan menunggu'),String(pending().length),null,pending().length?L('Tap Approve to review','Ketik Lulus untuk semak'):L('All clear','Semua selesai'),pending().length?'warn':'ok','var(--warn)')
      +kp(L('Money at risk','Wang berisiko'),rm0(risk),null,L('Estimate: expires within 3 days','Anggaran: luput dalam 3 hari'),'',''):
-     kp(L('Team tasks','Tugas pasukan'),`${doneT} ${L('of','daripada')} ${S.tasks.length}`,null,S.tasks.find(t=>!t.done)?L(S.tasks.find(t=>!t.done).en,S.tasks.find(t=>!t.done).ms):L('All done','Semua siap'),'','#AF52DE')
+     kp(L('Team tasks','Tugas pasukan'),`${doneT} ${L('of','daripada')} ${S.tasks.length}`,null,S.tasks.find(t=>!t.done)?taskText(S.tasks.find(t=>!t.done)):L('All done','Semua siap'),'','#AF52DE')
      +kp(L('Deliveries open','Penghantaran terbuka'),String(open),null,open?L('Orders on the way','Order dalam perjalanan'):L('No open orders','Tiada order terbuka'),'','var(--ok)')
      +kp(L('Approvals waiting','Kelulusan menunggu'),String(pending().length),null,pending().length?L('Waiting for the owner','Menunggu pemilik'):L('All clear','Semua selesai'),pending().length?'warn':'ok','var(--warn)')
      +kp(L('Items to reorder','Item untuk order semula'),String(fixO.length),null,L('Tap a tile to order','Ketik ubin untuk order'),fixO.length?'warn':'ok','var(--bad)');
@@ -116,6 +123,7 @@ export default function homeScene(api) {
     </section>
     <section class="pl-kpis" aria-label="${L('Today at a glance','Hari ini sekilas pandang')}">${kpis}</section>
    </div>
+   <section class="pl-tasks">${taskList()}</section>
    <p class="demo-note">${fin?'':L('Costs and values are hidden for your role. The owner can allow them in Rules. ','Kos dan nilai disembunyikan untuk peranan anda. Pemilik boleh benarkan dalam Tetapan. ')}${L('All figures are sample data for demonstration.','Semua nombor ialah data contoh untuk demo.')}</p></div>`;
   }
 

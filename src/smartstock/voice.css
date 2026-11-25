@@ -685,3 +685,20 @@
 #ss-root .mng-x:hover{background:rgba(255,69,58,.18);color:#FF453A}
 #ss-root .mng{display:flex;flex-direction:column;gap:6px;margin-top:12px;max-height:40vh;overflow:auto}
 #ss-root .mng>div{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:12px;background:var(--surface-2)}
+
+/* activity log */
+#ss-root .au-bar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:18px 0 6px}
+#ss-root .au-bar .row{display:flex;gap:8px;flex-wrap:wrap}
+#ss-root .au-bar a.btn{text-decoration:none}
+#ss-root .au-bar .chip[aria-pressed=true]{background:var(--accent);color:#fff}
+#ss-root .au-day{margin:22px 0 6px;font:600 13px var(--font);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+#ss-root .au-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+#ss-root .au-av{width:32px;height:32px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font:600 14px var(--font);font-style:normal;flex:none}
+#ss-root .au-av.ai{background:var(--accent);color:#fff}
+#ss-root .au-t{flex:1;min-width:0;line-height:1.4;overflow-wrap:anywhere}
+#ss-root .au-row time{color:var(--ink-2);font-variant-numeric:tabular-nums;font-size:13px;flex:none}
+/* tasks list */
+#ss-root .task small{display:block;color:var(--ink-2);font-weight:400;font-size:12px;margin-top:2px}
+#ss-root .task .hi{color:var(--r-crit,#FF453A);font-weight:700;margin-right:6px}
+#ss-root .task-x{border:0;background:none;color:var(--ink-2);font-size:16px;padding:6px;margin-left:auto}
+#ss-root .task-wrap{display:flex;align-items:stretch;gap:6px}#ss-root .task-wrap .task{flex:1}
