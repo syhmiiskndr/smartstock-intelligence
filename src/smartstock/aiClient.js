@@ -54,9 +54,10 @@ export async function inspectPhoto(file, { expectedFruit = '', baseUrl = BASE, r
 
 /** Turns the service answer into what the Fresh page shows. Shows the biggest fruit, but asks for a check if ANY fruit needs one. */
 export function toScanResult(json) {
-  const items = json.items || [];
+  // An item without a box means the detector found no fruit; the classifier then only guessed on the whole photo.
+  const items = (json.items || []).filter((x) => x.bbox);
   const it = items[0];
-  if (!it) return null;
+  if (!it) return { none: true, count: 0, ms: json.elapsed_ms };
   const flagged = items.find((x) => x.needs_confirmation); // any fruit that needs a worker check flags the whole photo
   return {
     bad: it.freshness === 'rotten',

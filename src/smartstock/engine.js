@@ -270,11 +270,13 @@ export function mountVoiceApp(host, opts = {}) {
      +(own?`<div class="rcard"><b>${L('Just exploring?','Sekadar mencuba?')}</b><p class="meta">${L('Load a sample fruit shop (10 items, 3 suppliers, 14 days of usage). You can reset it later in Rules.','Muat kedai buah contoh (10 item, 3 pembekal, 14 hari penggunaan). Boleh reset kemudian di Rules.')}</p><div class="row"><button class="btn" data-pp="seed">${L('Load sample data','Muat data contoh')}</button></div></div>`:''):''}`;
   }
   function render(bloom){
+   if(S.scene!=='fresh')stopCam();
    stage.innerHTML=(S.live&&!P.length&&EMPTY_OK.includes(S.scene)?emptyScene:SCENES[S.scene]||missingScene)();
    if(bloom){stage.classList.remove('bloom');void stage.offsetWidth;stage.classList.add('bloom');stage.scrollTop=0}
    if(S.scene==='ops')bindOps();
    if(S.scene==='home'&&S.role!=='staff'){if(bloom)S.pl.shown=0;plCount()}
    renderPetals();
+   if(S.scene==='fresh')attachCam();
   }
 
   /* ---- Business Pulse (home for owner and admin): patch the page in place so tiles, gauge and bars animate ---- */
@@ -582,16 +584,14 @@ export function mountVoiceApp(host, opts = {}) {
   const photoInput=document.createElement('input');
   photoInput.type='file';photoInput.accept='image/*';photoInput.setAttribute('capture','environment');photoInput.hidden=true;
   root.appendChild(photoInput);
-  photoInput.addEventListener('change',async()=>{
-   const f=photoInput.files&&photoInput.files[0];photoInput.value='';
-   if(!f)return;
+  photoInput.addEventListener('change',()=>{const f=photoInput.files&&photoInput.files[0];photoInput.value='';if(f)runScan(f)});
+  async function runScan(f){
    const F=S.fresh;
    if(F.shot)URL.revokeObjectURL(F.shot);
-   F.shot=URL.createObjectURL(F.shotFile=f);F.res=null;F.scanning=true;refresh();
+   F.shot=URL.createObjectURL(f);F.res=null;F.scanning=true;refresh();
    try{
     const out=toScanResult(await inspectPhoto(f));
     F.scanning=false;F.res=out;refresh();
-    if(!out)panel({state:L('Check','Semak'),tone:'warn',title:L('No fruit found in the photo.','Tiada buah dijumpai dalam gambar.'),body:L('Try again with the fruit filling the frame.','Cuba lagi dengan buah memenuhi bingkai.')});
    }catch(e){
     F.scanning=false;F.res=null;refresh();
     const net=e.kind==='network'||e.kind==='timeout';
@@ -599,18 +599,50 @@ export function mountVoiceApp(host, opts = {}) {
      title:net?L('Cannot reach the AI service.','Tidak dapat hubungi perkhidmatan AI.'):L('The AI service could not read this photo.','Perkhidmatan AI tidak dapat baca gambar ini.'),
      body:net?L('Check that the service is running and try again.','Pastikan perkhidmatan berjalan dan cuba lagi.'):(e.message||''),ttl:9000});
    }
-  });
+  }
+  /* live camera (computers with a webcam). Phones use the file input above, which opens the phone camera app. */
+  function stopCam(){const F=S.fresh;if(F.stream){F.stream.getTracks().forEach(t=>t.stop());F.stream=null}}
+  function attachCam(){
+   const F=S.fresh,v=stage.querySelector('#ss-cam');
+   if(v&&F.stream&&v.srcObject!==F.stream){v.srcObject=F.stream;v.play().catch(()=>{})}
+  }
+  async function startCam(){
+   const F=S.fresh;
+   try{
+    F.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}},audio:false});
+    if(F.shot){URL.revokeObjectURL(F.shot);F.shot=null}
+    F.res=null;refresh();
+   }catch(e){
+    stopCam();
+    panel({state:L('Camera unavailable','Kamera tidak tersedia'),tone:'warn',
+     title:L('The browser could not open a camera.','Pelayar tidak dapat buka kamera.'),
+     body:L('Allow camera access, or choose a photo from this computer.','Benarkan akses kamera, atau pilih gambar dari komputer ini.'),
+     actions:[{label:L('Choose a photo','Pilih gambar'),kind:'primary',fn:()=>photoInput.click()}],ttl:12000});
+   }
+  }
+  function snap(){
+   const F=S.fresh,v=stage.querySelector('#ss-cam');
+   if(!v||!v.videoWidth)return;
+   const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;
+   c.getContext('2d').drawImage(v,0,0);
+   stopCam(); // turns the camera light off
+   c.toBlob(b=>{if(b)runScan(new File([b],'photo.jpg',{type:'image/jpeg'}))},'image/jpeg',0.92);
+  }
   function scan(auto){
+   const F=S.fresh;
    if(!aiConfigured){
     panel({state:L('Coming soon','Akan datang'),tone:'warn',title:L('Freshness model not connected yet.','Model kesegaran belum disambung.'),body:L('The AI service address is not set (VITE_AI_SERVICE_URL).','Alamat perkhidmatan AI belum ditetapkan (VITE_AI_SERVICE_URL).')});
     return;
    }
-   if(S.fresh.scanning)return;
+   if(F.scanning)return;
    if(auto){ // a browser only opens the camera after a real tap, not after a voice command
     panel({state:L('Ready','Sedia'),tone:'ok',title:L('Tap the round button to take the photo.','Tekan butang bulat untuk ambil gambar.'),ttl:6000});
     return;
    }
-   photoInput.click();
+   if(F.stream)return snap();
+   const phone=window.matchMedia&&window.matchMedia('(pointer: coarse)').matches;
+   if(phone||!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))return photoInput.click();
+   startCam();
   }
 
   /* detail sheet for a jar */
@@ -649,6 +681,10 @@ export function mountVoiceApp(host, opts = {}) {
    if(b=t.closest('#stage [data-task]')){const k=S.tasks.find(x=>x.id===b.dataset.task);k.done=!k.done;return refresh()}
    if(b=t.closest('#stage [data-tile]'))return startDraft(b.dataset.tile,null,null,null,'');
    if(b=t.closest('#stage [data-scan]'))return scan();
+   if(b=t.closest('#stage [data-upload]')){stopCam();return photoInput.click()}
+   if(b=t.closest('#stage [data-cam-off]')){stopCam();return refresh()}
+   if(b=t.closest('#stage [data-clear]')){stopCam();const F=S.fresh;if(F.shot){URL.revokeObjectURL(F.shot);F.shot=null}F.res=null;return refresh()}
+   if(b=t.closest('#stage [data-retake]')){S.fresh.res=null;return scan()}
    if(b=t.closest('#stage [data-decide]')){const ok=b.dataset.decide==='ok';log(L('(button)','(butang)'),ok?L('Approve','Lulus'):L('Reject','Tolak'),L('Done','Dilaksana'));return decide(ok)}
    if(b=t.closest('#stage [data-speak]'))return speakBrief();
   });
@@ -1058,7 +1094,7 @@ export function mountVoiceApp(host, opts = {}) {
     },
     destroy() {
       offs.forEach((f) => f());
-      clearLive(); clearInterval(hintTimer);
+      clearLive(); clearInterval(hintTimer); stopCam();
       try { rec && rec.abort(); } catch (e) { /* mic not running */ }
       root.remove();
     },
