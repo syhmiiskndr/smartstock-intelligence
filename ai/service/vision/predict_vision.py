@@ -55,9 +55,9 @@ SEMI_NEEDS_CONFIRM = True
 FRESH_CONFIRM_BELOW = 0.90
 # Pile / mixed-ripeness guard: the box is cut into 3x3 tiles and each tile is classified. If at least
 # this share of tiles disagree with the whole-box verdict (rotten vs not rotten), the box is probably a
-# pile or a mix, so the worker is asked. Measured on 49 single-fruit photos: ~5% of correct photos flagged,
-# 5 of 6 wrong verdicts caught. Set to 1.01 to switch off.
-TILE_DISAGREE_ABOVE = 0.50
+# pile or a mix, so the worker is asked. Measured on 2,515 single-fruit FruitVision photos: 0.50 raised
+# "asked" from 21% to 33%; 0.66 (6 of 9 tiles) raises it to 27%. Set to 1.01 to switch off.
+TILE_DISAGREE_ABOVE = 0.66   # = 6 of the 9 tiles
 MIN_TILE_PX = 48
 
 

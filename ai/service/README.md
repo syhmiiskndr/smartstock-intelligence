@@ -66,10 +66,10 @@ Keep `AI_SERVICE_KEY` on the server side. Do not put it in the website code, bec
 
 - Only apple, banana, orange. Use `expected_fruit`.
 - On 2,515 outside banana/orange photos (before the pile check below): about 5.7% of rotten fruit was accepted as
-  fresh without a worker check, and about 21% of photos were sent to a worker. With the pile check at 0.67, about
+  fresh without a worker check, and about 21% of photos were sent to a worker. With the pile check at 6 of 9 tiles, about
   27% are sent to a worker and about 1.1% of rotten photos are accepted as fresh.
 - Piles and crowded trays are not supported. The detector merges fruit into giant boxes and one verdict covers
-  the whole box. Each item has `tile_disagree` (share of 3x3 tiles that disagree with the verdict); at 0.67 or
+  the whole box. Each item has `tile_disagree` (share of 3x3 tiles that disagree with the verdict); at 6 of 9 tiles or
   more the item is sent to a worker. This catches only some piles. Ask workers to photograph a few fruit at a
   time, and do not use a merged box for weight estimates (`boxes_merged` > 1 means several fruit in one box).
 - Fruit that is tiny in a cluttered photo is unreliable (45% in the stress test). Ask for the fruit to fill the frame.
