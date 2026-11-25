@@ -9,3 +9,5 @@ spoilage risk, draft purchase orders (no duplicates, approve/reject, no vendor, 
 `0007_daily_metrics.sql` runs after 0006; `05_metrics.sql` checks that the daily numbers behind every chart add up to the raw transactions.
 `0008_tasks_and_audit.sql` runs after 0007; `06_tasks_audit.sql` checks task generation (no duplicates, auto-close), who may complete / create / cancel
 tasks (writes only through functions), the manager-only activity feed (stock, changes with old/new values, completed tasks, paging) and company isolation.
+`0009_autonomy_and_settings.sql` runs after 0008; `07_autonomy_settings.sql` checks that only the owner can change rules (bad keys/values refused), suggest/draft/auto purchasing,
+per-order limit and daily cap, auto-orders attributed to SmartStock AI and never duplicated, and the low-stock / expiry alert switches.

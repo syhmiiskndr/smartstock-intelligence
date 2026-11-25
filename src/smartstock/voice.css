@@ -702,3 +702,13 @@
 #ss-root .task .hi{color:var(--r-crit,#FF453A);font-weight:700;margin-right:6px}
 #ss-root .task-x{border:0;background:none;color:var(--ink-2);font-size:16px;padding:6px;margin-left:auto}
 #ss-root .task-wrap{display:flex;align-items:stretch;gap:6px}#ss-root .task-wrap .task{flex:1}
+/* autonomy picker on Rules */
+#ss-root .au-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:6px 0 14px}
+#ss-root .au-opt{text-align:left;border:1.5px solid var(--line);background:transparent;border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:6px;cursor:pointer;color:inherit;font:inherit;transition:border-color .2s,background .2s}
+#ss-root .au-opt b{font-weight:700}
+#ss-root .au-opt span{font-size:13px;color:var(--ink-2);line-height:1.35}
+#ss-root .au-opt[aria-checked=true]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+#ss-root .au-note{font-size:13px;color:var(--ink-2);margin:0;padding:12px 0 14px;border-top:1px solid var(--line)}
+@media(max-width:700px){#ss-root .au-opts{grid-template-columns:1fr}}
+#ss-root .slide b{white-space:nowrap;min-width:84px}
+#ss-root .rule select{border:1px solid var(--line);background:var(--surface-2);color:inherit;border-radius:12px;padding:8px 12px;font:inherit}
