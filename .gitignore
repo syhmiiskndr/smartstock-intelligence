@@ -16,3 +16,8 @@ Thumbs.db
 
 # AI data and model exports are large; keep them out of Git
 ai/data/
+
+# AI service: its virtual environment, and the large model files (copy them in by hand, see ai/service/README.md)
+ai/service/.venv/
+ai/service/models/*.onnx
+__pycache__/

@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+onnxruntime>=1.18
+numpy
+pillow
+httpx            # only needed to run tests/test_service.py
